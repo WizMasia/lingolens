@@ -55,6 +55,10 @@ export const createInlineView = (
   };
 
   const render = (record: ElementRecord): void => {
+    if (record.phase === "stale") {
+      restore(record);
+      return;
+    }
     const success = record.lastSuccess;
     if (success === null) return;
     let entry = entries.get(record);
@@ -78,6 +82,10 @@ export const createInlineView = (
   return {
     render,
     setError(record, message) {
+      if (record.phase === "stale") {
+        restore(record);
+        return;
+      }
       render(record);
       const entry = entries.get(record);
       if (entry === undefined) return;

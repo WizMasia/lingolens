@@ -262,4 +262,29 @@ describe("element records", () => {
     expect(styles).toContain("min-inline-size: var(--lt-target-min");
     expect(styles).toContain("min-block-size: var(--lt-target-min");
   });
+
+  it.each([
+    "render",
+    "setError",
+  ] as const)("does not recreate stale inline UI through %s", (method) => {
+    const store = createRecordStore();
+    const record = store.getOrCreate(sourceFixture("Hello"));
+    record.complete("Bonjour", "en", "fr");
+    const onAction = vi.fn();
+    const view = createInlineView(document, { onAction });
+    view.render(record);
+    store.markStale(record);
+
+    switch (method) {
+      case "render":
+        view.render(record);
+        break;
+      case "setError":
+        view.setError(record, "Translation unavailable");
+        break;
+    }
+
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    expect(onAction).not.toHaveBeenCalled();
+  });
 });

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { cp, mkdir, rm } from "node:fs/promises";
 import { build } from "esbuild";
 
@@ -16,10 +17,14 @@ await build({
   target: "chrome138",
   sourcemap: true,
 });
-await Promise.all([
+const staticCopies = [
   cp("src/manifest.json", "dist/manifest.json"),
   cp("src/popup/popup.html", "dist/popup.html"),
   cp("src/options/options.html", "dist/options.html"),
   cp("src/styles", "dist/styles", { recursive: true }),
-  cp("src/icons", "dist/icons", { recursive: true }),
-]);
+];
+const iconCopies = existsSync("src/icons")
+  ? [cp("src/icons", "dist/icons", { recursive: true })]
+  : [];
+
+await Promise.all([...staticCopies, ...iconCopies]);

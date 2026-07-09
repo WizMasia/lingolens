@@ -1,0 +1,32 @@
+body {
+  margin: 0;
+  background: var(--lt-color-paper);
+  color: var(--lt-color-ink);
+  font-family: var(--lt-font-control);
+  font-size: var(--lt-font-size-body);
+  line-height: var(--lt-line-height-control);
+}
+
+main {
+  box-sizing: border-box;
+  padding: var(--lt-space-4);
+}
+
+h1 {
+  margin: 0 0 var(--lt-space-2);
+  font-size: var(--lt-font-size-title);
+  line-height: var(--lt-line-height-control);
+}
+
+p {
+  margin: 0;
+}
+
+.lt-popup-shell {
+  width: var(--lt-popup-width);
+}
+
+.lt-options-shell main {
+  max-width: var(--lt-options-max-width);
+  margin-inline: auto;
+}

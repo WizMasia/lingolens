@@ -11,14 +11,14 @@ type HoverEntry = {
   readonly actionHost: HTMLElement;
   readonly meta: HTMLElement;
   readonly status: HTMLElement;
-  readonly originalLang: string | null;
-  readonly originalDir: string | null;
+  originalLang: string | null;
+  originalDir: string | null;
+  readonly originalTabIndex: string | null;
+  readonly ownsTabIndex: boolean;
   readonly enter: EventListener;
   readonly leave: EventListener;
   readonly focus: EventListener;
   readonly blur: EventListener;
-  readonly actionLeave: EventListener;
-  readonly actionBlur: EventListener;
   readonly unregisterRestorer: () => void;
   pointerActive: boolean;
   focusActive: boolean;
@@ -32,13 +32,15 @@ const HOVER_STYLES = `
   :host { display: inline-block; margin-inline-start: var(--lt-space-2, 8px); }
   :host([hidden]) { display: none; }
   .surface { align-items: center; background: var(--lt-color-paper, #f7f4ec);
-    border: 1px solid var(--lt-color-border, rgb(23 32 27 / 12%));
+    border: var(--lt-border, 1px solid rgb(23 32 27 / 12%));
     border-radius: var(--lt-radius, 10px); color: var(--lt-color-ink, #17201b);
     display: flex; gap: var(--lt-space-2, 8px); padding-inline: var(--lt-space-2, 8px); }
-  .meta, .status, button { font: 0.75rem/1.4 var(--lt-font-control, system-ui, sans-serif); }
+  .meta, .status, button { font: var(--lt-font-size-caption, 0.75rem)/
+    var(--lt-line-height-control, 1.4) var(--lt-font-control, system-ui, sans-serif); }
   .status { color: var(--lt-color-danger, #a33a32); }
   button { background: transparent; border: 0; color: var(--lt-color-moss, #2f6d4f);
-    cursor: pointer; min-block-size: 44px; padding: 0; }
+    cursor: pointer; min-block-size: var(--lt-target-min, 44px);
+    min-inline-size: var(--lt-target-min, 44px); padding: 0; }
   button:focus-visible { box-shadow: var(--lt-focus-ring, 0 0 0 2px #2f6d4f); outline: 0; }
 `;
 
@@ -51,6 +53,9 @@ export const createHoverView = (
     const entry = entries.get(record);
     if (entry === undefined) return;
     restoreText(entry);
+    if (entry.ownsTabIndex) {
+      restoreOwnedAttribute(record.source, "tabindex", "0", entry.originalTabIndex);
+    }
     removeListeners(entry);
     entry.unregisterRestorer();
     entry.actionHost.remove();
@@ -86,6 +91,9 @@ const createEntry = (
   deactivate: () => void,
 ): HoverEntry => {
   const { host, meta, status, button } = createActionSurface(record.source.ownerDocument);
+  const originalTabIndex = record.source.getAttribute("tabindex");
+  const ownsTabIndex = record.source.tabIndex < 0;
+  if (ownsTabIndex) record.source.setAttribute("tabindex", "0");
   let entry: HoverEntry;
   entry = {
     record,
@@ -94,6 +102,8 @@ const createEntry = (
     status,
     originalLang: record.source.getAttribute("lang"),
     originalDir: record.source.getAttribute("dir"),
+    originalTabIndex,
+    ownsTabIndex,
     enter: () => {
       entry.pointerActive = true;
       activate(entry);
@@ -114,12 +124,6 @@ const createEntry = (
       entry.focusActive = false;
       if (!movesInto(entry.actionHost, event)) settle(entry);
     },
-    actionLeave: () => {
-      settle(entry);
-    },
-    actionBlur: () => {
-      settle(entry);
-    },
     unregisterRestorer: record.registerRestorer(deactivate),
     pointerActive: false,
     focusActive: false,
@@ -128,6 +132,8 @@ const createEntry = (
     appliedLang: null,
     appliedDir: null,
   };
+  host.addEventListener("pointerleave", () => settle(entry));
+  host.addEventListener("focusout", () => settle(entry));
   button.addEventListener("click", () => actions.onAction(record));
   button.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
@@ -176,8 +182,6 @@ const addListeners = (entry: HoverEntry): void => {
   source.addEventListener("pointerleave", entry.leave);
   source.addEventListener("focus", entry.focus);
   source.addEventListener("blur", entry.blur);
-  entry.actionHost.addEventListener("pointerleave", entry.actionLeave);
-  entry.actionHost.addEventListener("focusout", entry.actionBlur);
 };
 
 const removeListeners = (entry: HoverEntry): void => {
@@ -186,8 +190,6 @@ const removeListeners = (entry: HoverEntry): void => {
   source.removeEventListener("pointerleave", entry.leave);
   source.removeEventListener("focus", entry.focus);
   source.removeEventListener("blur", entry.blur);
-  entry.actionHost.removeEventListener("pointerleave", entry.actionLeave);
-  entry.actionHost.removeEventListener("focusout", entry.actionBlur);
 };
 
 const activate = (entry: HoverEntry): void => {
@@ -200,6 +202,9 @@ const activate = (entry: HoverEntry): void => {
   )
     return;
   if (!entry.translated) {
+    entry.originalLang = entry.record.source.getAttribute("lang");
+    entry.originalDir = entry.record.source.getAttribute("dir");
+    entry.record.beginViewOwnership();
     for (const snapshot of entry.record.currentSnapshot) {
       setViewText(entry.record, snapshot, snapshot === target ? success.text : "");
     }
@@ -229,6 +234,7 @@ const restoreText = (entry: HoverEntry): void => {
   restoreOwnedAttribute(entry.record.source, "lang", entry.appliedLang, entry.originalLang);
   restoreOwnedAttribute(entry.record.source, "dir", entry.appliedDir, entry.originalDir);
   entry.translated = false;
+  entry.record.endViewOwnership();
   entry.appliedLang = null;
   entry.appliedDir = null;
 };

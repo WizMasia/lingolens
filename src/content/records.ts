@@ -73,6 +73,7 @@ export class ElementRecord {
   #languageOverride: ElementLanguageOverride | null = null;
   #viewValues = new Map<Text, string>();
   #viewMutationCounts = new Map<Text, number>();
+  #activeViewCount = 0;
   #restorers = new Set<RestoreCallback>();
   readonly #onPhaseChange: PhaseCallback;
 
@@ -124,7 +125,7 @@ export class ElementRecord {
     this.#assertTransition("translated");
     this.#phase = "translated";
     this.#lastSuccess = { text, sourceLanguage, targetLanguage };
-    if ((this.source.textContent ?? "") === sourceFingerprint) {
+    if (this.#activeViewCount === 0 && (this.source.textContent ?? "") === sourceFingerprint) {
       this.#currentSnapshot = snapshotText(this.source);
     }
     this.#sourceFingerprint = sourceFingerprint;
@@ -156,6 +157,14 @@ export class ElementRecord {
   noteViewMutation(node: Text, value: string): void {
     this.#viewValues.set(node, value);
     this.#viewMutationCounts.set(node, (this.#viewMutationCounts.get(node) ?? 0) + 1);
+  }
+
+  beginViewOwnership(): void {
+    this.#activeViewCount += 1;
+  }
+
+  endViewOwnership(): void {
+    if (this.#activeViewCount > 0) this.#activeViewCount -= 1;
   }
 
   isViewMutation(node: Text): boolean {

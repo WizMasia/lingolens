@@ -11,6 +11,8 @@ type InlineEntry = Readonly<{
   translation: HTMLElement;
   meta: HTMLElement;
   status: HTMLElement;
+  button: HTMLButtonElement;
+  onAction: EventListener;
   unregisterRestorer: () => void;
 }>;
 
@@ -22,16 +24,18 @@ const INLINE_STYLES = `
     margin-block: var(--lt-space-2, 8px);
   }
   .surface { background: var(--lt-color-paper, #f7f4ec);
-    border: 1px solid var(--lt-color-border, rgb(23 32 27 / 12%));
+    border: var(--lt-border, 1px solid rgb(23 32 27 / 12%));
     border-radius: var(--lt-radius, 10px); color: var(--lt-color-ink, #17201b);
     padding: var(--lt-space-3, 12px); }
-  .translation { font: 0.875rem/1.6 var(--lt-font-translation, ui-serif, Georgia, serif);
+  .translation { font: var(--lt-font-size-body, 0.875rem)/var(--lt-line-height-reading, 1.6)
+    var(--lt-font-translation, ui-serif, Georgia, serif);
     white-space: pre-wrap; }
-  .meta, .status, button { font: 0.75rem/1.4 var(--lt-font-control, system-ui, sans-serif); }
+  .meta, .status, button { font: var(--lt-font-size-caption, 0.75rem)/
+    var(--lt-line-height-control, 1.4) var(--lt-font-control, system-ui, sans-serif); }
   .meta { margin-block-start: var(--lt-space-2, 8px); }
   .status { color: var(--lt-color-danger, #a33a32); }
   button { background: transparent; border: 0; color: var(--lt-color-moss, #2f6d4f); cursor: pointer;
-    min-block-size: 44px; padding: 0; }
+    min-block-size: var(--lt-target-min, 44px); min-inline-size: var(--lt-target-min, 44px); padding: 0; }
   button:focus-visible { box-shadow: var(--lt-focus-ring, 0 0 0 2px #2f6d4f); outline: 0; }
 `;
 
@@ -44,6 +48,7 @@ export const createInlineView = (
   const restore = (record: ElementRecord): void => {
     const entry = entries.get(record);
     if (entry === undefined) return;
+    entry.button.removeEventListener("click", entry.onAction);
     entry.unregisterRestorer();
     entry.host.remove();
     entries.delete(record);
@@ -54,13 +59,7 @@ export const createInlineView = (
     if (success === null) return;
     let entry = entries.get(record);
     if (entry === undefined) {
-      const onLifecycle = (reason: RecordLifecycle): void => {
-        if (reason === "stale") {
-          entry?.status.replaceChildren("원문이 변경되었습니다.");
-          return;
-        }
-        restore(record);
-      };
+      const onLifecycle = (): void => restore(record);
       entry = createEntry(document, record, actions, onLifecycle);
     }
     if (!entries.has(record)) {
@@ -115,11 +114,12 @@ const createEntry = (
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = "Change language";
-  button.addEventListener("click", () => actions.onAction(record));
+  const onAction: EventListener = () => actions.onAction(record);
+  button.addEventListener("click", onAction);
   surface.append(translation, meta, status, button);
   shadow.append(style, surface);
   const unregisterRestorer = record.registerRestorer(onLifecycle);
-  return { host, translation, meta, status, unregisterRestorer };
+  return { host, translation, meta, status, button, onAction, unregisterRestorer };
 };
 
 const languageDirection = (language: string): "ltr" | "rtl" => {

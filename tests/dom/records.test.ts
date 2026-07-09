@@ -1,6 +1,8 @@
 import { Window } from "happy-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { createHoverView } from "../../src/content/hover-view";
+import { createInlineView } from "../../src/content/inline-view";
 import { createRecordStore, InvalidRecordTransitionError } from "../../src/content/records";
 
 const testWindow = new Window();
@@ -8,6 +10,17 @@ Object.defineProperty(globalThis, "document", {
   configurable: true,
   value: testWindow.document,
 });
+Object.defineProperties(globalThis, {
+  Element: { configurable: true, value: testWindow.Element },
+  Event: { configurable: true, value: testWindow.Event },
+});
+const shadowRoots = new WeakMap<Element, ShadowRoot>();
+const attachShadow = Element.prototype.attachShadow;
+Element.prototype.attachShadow = function (init): ShadowRoot {
+  const shadow = attachShadow.call(this, init);
+  shadowRoots.set(this, shadow);
+  return shadow;
+};
 
 const sourceFixture = (markup = "Hello <em>careful</em> world"): HTMLElement => {
   document.body.innerHTML = `<p id="source">${markup}</p>`;
@@ -143,5 +156,110 @@ describe("element records", () => {
 
     // Then
     expect([first, second]).toEqual([true, false]);
+  });
+
+  it("does not refresh a multi-node snapshot from an active identity translation", () => {
+    const record = createRecordStore().getOrCreate(sourceFixture("Hello <em>world</em>"));
+    record.complete("Hello world", "en", "en");
+    createHoverView().render(record);
+    record.source.dispatchEvent(new Event("pointerenter"));
+
+    record.complete("Salut", "en", "fr");
+
+    expect(record.currentSnapshot.map(({ value }) => value)).toEqual(["Hello ", "world"]);
+  });
+
+  it.each([
+    "stale",
+    "remove",
+    "clear",
+    "destroy",
+  ] as const)("restores an injected tabindex during %s cleanup", (cleanup) => {
+    const store = createRecordStore();
+    const source = sourceFixture("Hello");
+    const record = store.getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+    const view = createHoverView();
+    view.render(record);
+    expect(source.getAttribute("tabindex")).toBe("0");
+
+    switch (cleanup) {
+      case "stale":
+        store.markStale(record);
+        break;
+      case "remove":
+        store.remove(source);
+        break;
+      case "clear":
+        store.clear();
+        break;
+      case "destroy":
+        view.destroy();
+        break;
+    }
+
+    expect(source.hasAttribute("tabindex")).toBe(false);
+  });
+
+  it("restores attributes captured when hover activates", () => {
+    const source = sourceFixture("Hello");
+    source.lang = "en";
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("مرحبا", "en", "ar");
+    createHoverView().render(record);
+    source.lang = "de";
+    source.dir = "auto";
+
+    source.dispatchEvent(new Event("pointerenter"));
+    source.dispatchEvent(new Event("pointerleave"));
+
+    expect([source.lang, source.dir]).toEqual(["de", "auto"]);
+  });
+
+  it("preserves a page-owned tabindex change during cleanup", () => {
+    const source = sourceFixture("Hello");
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+    const view = createHoverView();
+    view.render(record);
+    source.setAttribute("tabindex", "5");
+
+    view.destroy();
+
+    expect(source.getAttribute("tabindex")).toBe("5");
+  });
+
+  it("removes inline stale UI and disconnects its action callback", () => {
+    const store = createRecordStore();
+    const record = store.getOrCreate(sourceFixture("Hello"));
+    record.complete("Bonjour", "en", "fr");
+    const onAction = vi.fn();
+    createInlineView(document, { onAction }).render(record);
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
+    if (host === null) throw new Error("fixture inline host missing");
+    const button = shadowRoots.get(host)?.querySelector<HTMLButtonElement>("button");
+    if (button === null || button === undefined) throw new Error("fixture action missing");
+
+    store.markStale(record);
+    button.click();
+
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("uses canonical typography, border, and target-size tokens", () => {
+    const record = createRecordStore().getOrCreate(sourceFixture("Hello"));
+    record.complete("Bonjour", "en", "fr");
+    createInlineView(document).render(record);
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
+    if (host === null) throw new Error("fixture inline host missing");
+
+    const styles = shadowRoots.get(host)?.querySelector("style")?.textContent ?? "";
+
+    expect(styles).toContain("var(--lt-font-size-body");
+    expect(styles).toContain("var(--lt-line-height-reading");
+    expect(styles).toContain("var(--lt-border");
+    expect(styles).toContain("min-inline-size: var(--lt-target-min");
+    expect(styles).toContain("min-block-size: var(--lt-target-min");
   });
 });

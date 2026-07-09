@@ -1,3 +1,4 @@
+import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
 import {
   type TranslationEngine,
@@ -17,7 +18,6 @@ export type TranslationRuntime = Readonly<{
   engine: TranslationEngine;
   store: RecordStore;
   view(): TranslationView;
-  notice(message: string): void;
   announce(message: string): void;
 }>;
 
@@ -85,7 +85,7 @@ const commitResult = (commit: ResultCommit): boolean => {
     case "unknown-source":
       record.fail(UNKNOWN_SOURCE_NOTICE);
       runtime.view().setError(record, UNKNOWN_SOURCE_NOTICE);
-      runtime.notice(UNKNOWN_SOURCE_NOTICE);
+      runtime.announce(UNKNOWN_SOURCE_NOTICE);
       return false;
     default:
       return assertNever(result);
@@ -98,8 +98,10 @@ const recordText = (record: ElementRecord): string =>
     .filter((value) => value.length > 0)
     .join(" ");
 
-const nearestLanguage = (source: HTMLElement): string | undefined =>
-  source.closest("[lang]")?.getAttribute("lang")?.trim() || undefined;
+const nearestLanguage = (source: HTMLElement): string | undefined => {
+  const language = source.closest("[lang]")?.getAttribute("lang")?.trim();
+  return language === undefined || language.length === 0 ? undefined : normalizeLanguage(language);
+};
 
 const nearbyContext = (source: HTMLElement, sourceText: string): string => {
   const candidates = [

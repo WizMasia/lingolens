@@ -50,6 +50,11 @@ export type TranslationControllerDependencies = Readonly<{
   notice?: (message: string) => void;
 }>;
 
+type PoliteAnnouncer = Readonly<{
+  announce(message: string): void;
+  destroy(): void;
+}>;
+
 const NO_TARGET_NOTICE = "텍스트 요소를 선택하거나 가리켜 주세요.";
 
 export const createTranslationController = (
@@ -84,12 +89,15 @@ export const createTranslationController = (
   const menu =
     dependencies.menu ??
     createElementMenu(dependencies.document, dependencies.languages ?? settingsLanguages(settings));
+  const announcer = createPoliteAnnouncer(dependencies.document);
   const runtime: TranslationRuntime = {
     engine: dependencies.engine,
     store,
     view: () => view,
-    notice,
-    announce: (message) => menu.announce(message),
+    announce: (message) => {
+      menu.announce(message);
+      announcer.announce(message);
+    },
   };
 
   const perform = async (attempt: TranslationAttempt): Promise<boolean> => {
@@ -157,10 +165,35 @@ export const createTranslationController = (
     },
     destroy() {
       menu.destroy();
+      announcer.destroy();
       view.destroy();
       store.clear();
       dependencies.engine.destroy();
       hovered = null;
+    },
+  };
+};
+
+const createPoliteAnnouncer = (document: Document): PoliteAnnouncer => {
+  const host = document.createElement("div");
+  host.setAttribute("data-local-translator-ui", "announcer");
+  const shadow = host.attachShadow({ mode: "closed" });
+  const style = document.createElement("style");
+  style.textContent = `
+    :host { block-size: 1px; clip-path: inset(50%); inline-size: 1px;
+      overflow: hidden; position: fixed; white-space: nowrap; }
+  `;
+  const status = document.createElement("div");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  shadow.append(style, status);
+  document.body.append(host);
+  return {
+    announce(message) {
+      status.textContent = message;
+    },
+    destroy() {
+      host.remove();
     },
   };
 };

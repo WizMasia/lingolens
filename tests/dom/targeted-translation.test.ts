@@ -162,7 +162,7 @@ describe("targeted translation", () => {
     expect(document.querySelector("img")).toBeNull();
   });
 
-  it("sends the ancestor language hint and at most 160 characters of nearby context", async () => {
+  it("canonicalizes the ancestor language hint and bounds nearby context", async () => {
     // Given
     const parent = document.createElement("section");
     parent.lang = "en-US";
@@ -181,13 +181,31 @@ describe("targeted translation", () => {
     // Then
     expect(requests[0]?.source).toEqual({
       kind: "auto",
-      languageHint: "en-US",
+      languageHint: "en",
       context: expect.any(String),
     });
     const request = requests[0];
     expect(
       request?.source.kind === "auto" ? request.source.context?.length : undefined,
     ).toBeLessThanOrEqual(160);
+  });
+
+  it("omits a malformed ancestor language hint", async () => {
+    // Given
+    const parent = document.createElement("section");
+    parent.setAttribute("lang", "not_a_language!");
+    const source = document.createElement("p");
+    source.textContent = "Save";
+    parent.append(source);
+    document.body.append(parent);
+    const { engine, requests } = engineFixture();
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.translateTarget(source);
+
+    // Then
+    expect(requests[0]?.source).toEqual({ kind: "auto" });
   });
 
   it("does not render when the source fingerprint changes while translating", async () => {

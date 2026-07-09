@@ -154,7 +154,12 @@ const appendLanguages = (
   select: HTMLSelectElement,
   languages: readonly ElementLanguageChoice[],
 ): void => {
-  for (const language of languages) appendOption(select, language.value, language.label);
+  const values = new Set(Array.from(select.options, ({ value }) => value));
+  for (const language of languages) {
+    if (language.value === "auto" || values.has(language.value)) continue;
+    appendOption(select, language.value, language.label);
+    values.add(language.value);
+  }
 };
 
 const appendOption = (select: HTMLSelectElement, value: string, label: string): void => {

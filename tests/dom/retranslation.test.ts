@@ -5,11 +5,16 @@ import type {
   TranslationRequest,
   TranslationResult,
 } from "../../src/content/ai-engine";
+import { TranslationError } from "../../src/content/ai-engine";
 import {
   createTranslationController,
   type ElementLanguageChoice,
 } from "../../src/content/controller";
-import { createElementMenu } from "../../src/content/element-menu";
+import {
+  createElementMenu,
+  type ElementMenu,
+  type ElementMenuResult,
+} from "../../src/content/element-menu";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -154,6 +159,35 @@ describe("per-element retranslation", () => {
     await expect(pending).resolves.toEqual({ kind: "translate", source: "en", target: "ja" });
   });
 
+  it("excludes Auto from targets and deduplicates the source Auto option", async () => {
+    // Given
+    const source = sourceFixture();
+    const menu = createElementMenu(document, [
+      { value: "auto", label: "Duplicate Auto" },
+      { value: "en", label: "English" },
+      { value: "en", label: "English duplicate" },
+      { value: "ko", label: "Korean" },
+    ]);
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    if (host === null) throw new Error("fixture menu missing");
+    const shadow = shadowRoots.get(host);
+    const sourceOptions = shadow?.querySelector<HTMLSelectElement>('select[name="source"]');
+    const targetOptions = shadow?.querySelector<HTMLSelectElement>('select[name="target"]');
+
+    // When
+    menu.destroy();
+
+    // Then
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+    expect([...(sourceOptions?.options ?? [])].map(({ value }) => value)).toEqual([
+      "auto",
+      "en",
+      "ko",
+    ]);
+    expect([...(targetOptions?.options ?? [])].map(({ value }) => value)).toEqual(["en", "ko"]);
+  });
+
   it("keeps the last successful text and announces a typed failure", async () => {
     // Given
     const source = sourceFixture();
@@ -162,7 +196,6 @@ describe("per-element retranslation", () => {
       async translate() {
         attempt += 1;
         if (attempt === 1) return result("안녕하세요", "ko");
-        const { TranslationError } = await import("../../src/content/ai-engine");
         throw new TranslationError("pair-unavailable", "internal detail");
       },
       async availability() {
@@ -180,6 +213,53 @@ describe("per-element retranslation", () => {
     expect(inlineText()).toContain("안녕하세요");
     expect(inlineText()).not.toContain("internal detail");
     expect(inlineText()).toContain("선택한 언어 쌍은 사용할 수 없습니다.");
+    const announcer = document.querySelector<HTMLElement>('[data-local-translator-ui="announcer"]');
+    expect(announcer === null ? "" : shadowRoots.get(announcer)?.textContent).toContain(
+      "선택한 언어 쌍은 사용할 수 없습니다.",
+    );
+  });
+
+  it("announces unknown source locally while preserving the last success", async () => {
+    // Given
+    const source = sourceFixture();
+    let attempt = 0;
+    const engine: TranslationEngine = {
+      async translate() {
+        attempt += 1;
+        return attempt === 1 ? result("안녕하세요", "ko") : { kind: "unknown-source" };
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const announcements: string[] = [];
+    const notices: string[] = [];
+    const menu: ElementMenu = {
+      async open(): Promise<ElementMenuResult> {
+        return { kind: "cancel" };
+      },
+      announce(message) {
+        announcements.push(message);
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      menu,
+      notice: (message) => notices.push(message),
+      settings: SETTINGS,
+    });
+    await controller.translateTarget(source);
+
+    // When
+    await controller.retranslate(source, { source: "auto", target: "ja" });
+
+    // Then
+    expect(inlineText()).toContain("안녕하세요");
+    expect(announcements).toEqual(["원문 언어를 확인할 수 없습니다."]);
+    expect(notices).toEqual([]);
   });
 
   it("restores the element and clears its language override", async () => {

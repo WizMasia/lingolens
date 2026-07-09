@@ -67,12 +67,7 @@ class FixtureRectList implements DOMRectList {
 }
 
 const visibleRects = new FixtureRectList(100, 20);
-
-function markVisible(...elements: readonly Element[]): void {
-  for (const element of elements) {
-    element.getClientRects = () => visibleRects;
-  }
-}
+window.HTMLElement.prototype.getClientRects = () => visibleRects;
 
 function elementById(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -116,8 +111,6 @@ describe("target discovery", () => {
       <div contenteditable="true"><p id="locked" contenteditable="false">Published sentence.</p></div>
       <div data-local-translator-ui>Own UI</div>
     `;
-    markVisible(elementById("paragraph"), elementById("leaf"), elementById("locked"));
-
     // When
     const targets = discoverTargets(document);
 
@@ -133,7 +126,6 @@ describe("target discovery", () => {
     // Given
     document.body.innerHTML = `<article><p id="target">Selected sentence here.</p></article>`;
     const target = elementById("target");
-    markVisible(target);
     const text = target.firstChild;
     if (text === null) {
       throw new Error("fixture text missing");
@@ -165,7 +157,6 @@ describe("target discovery", () => {
     const numeric = elementById("numeric");
     const disconnected = document.createElement("p");
     disconnected.textContent = "Detached sentence.";
-    markVisible(visible, hiddenAttribute, ariaHidden, punctuation, numeric, disconnected);
 
     // When
     const eligibility = [
@@ -181,17 +172,26 @@ describe("target discovery", () => {
     expect(eligibility).toEqual([true, false, false, false, false, false]);
   });
 
-  it("excludes an element whose client rectangles have zero area", () => {
+  it("excludes zero-area elements and their light or shadow descendants", () => {
     // Given
-    document.body.innerHTML = `<p id="target">Readable sentence.</p>`;
-    const target = elementById("target");
-    target.getClientRects = () => new FixtureRectList(0, 0);
+    document.body.innerHTML = `<div id="blocked"><p id="child">Blocked sentence.</p></div><div id="host"></div>`;
+    const blocked = elementById("blocked");
+    const child = elementById("child");
+    const host = elementById("host");
+    blocked.getClientRects = () => new FixtureRectList(0, 0);
+    host.getClientRects = () => new FixtureRectList(0, 0);
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    shadowRoot.innerHTML = `<p id="shadow-child">Shadow blocked sentence.</p>`;
 
     // When
-    const eligible = isEligibleElement(target);
+    const result = [
+      isEligibleElement(blocked),
+      isEligibleElement(child),
+      discoverTargets(document).map((element) => element.id),
+    ];
 
     // Then
-    expect(eligible).toBe(false);
+    expect(result).toEqual([false, false, []]);
   });
 
   it("returns the deepest meaningful target instead of its eligible ancestors", () => {
@@ -199,7 +199,6 @@ describe("target discovery", () => {
     document.body.innerHTML = `
       <article id="article"><section id="section"><p id="deepest">Deep meaningful sentence.</p></section></article>
     `;
-    markVisible(elementById("article"), elementById("section"), elementById("deepest"));
 
     // When
     const targets = discoverTargets(document);
@@ -212,7 +211,6 @@ describe("target discovery", () => {
     // Given
     document.body.innerHTML = `<p id="parent">Parent sentence. <span id="child">Child sentence.</span></p>`;
     const parent = elementById("parent");
-    markVisible(parent, elementById("child"));
 
     // When
     const targets = discoverTargets(document);
@@ -226,11 +224,11 @@ describe("target discovery", () => {
     // Given
     document.body.innerHTML = `
       <p id="target">Visible sentence.<span hidden>Hidden note.</span><code>secret()</code>
-        <svg><title>Icon title</title><desc>Icon description</desc></svg><span>Zero-sized note.</span>
+        <svg><title>Icon title</title><desc>Icon description</desc></svg><span id="zero">Zero-sized note.</span>
       </p>
     `;
     const target = elementById("target");
-    markVisible(target);
+    elementById("zero").getClientRects = () => new FixtureRectList(0, 0);
 
     // When
     const targets = discoverTargets(document);
@@ -252,7 +250,6 @@ describe("target discovery", () => {
     const opacity = elementById("opacity");
     const contentVisibility = elementById("content-visibility");
     const override = elementById("override");
-    markVisible(visibility, opacity, contentVisibility, override);
 
     // When
     const eligibility = [
@@ -270,7 +267,6 @@ describe("target discovery", () => {
     // Given
     document.body.innerHTML = `<p id="target">Selected sentence here.</p>`;
     const target = elementById("target");
-    markVisible(target);
     const range = document.createRange();
     range.selectNodeContents(target);
     range.collapse(true);
@@ -295,7 +291,6 @@ describe("target discovery", () => {
     if (!(target instanceof HTMLElement)) {
       throw new Error("shadow fixture target missing");
     }
-    markVisible(target);
 
     // When
     const targets = discoverTargets(document);
@@ -308,7 +303,6 @@ describe("target discovery", () => {
     // Given
     document.body.innerHTML = `<p id="target">  Hello <strong id="nested"> nested\n text </strong> world. </p>`;
     const target = elementById("target");
-    markVisible(target, elementById("nested"));
     const originalHtml = target.innerHTML;
 
     // When
@@ -325,7 +319,6 @@ describe("target discovery", () => {
     const target = elementById("target");
     const child = elementById("child");
     const code = elementById("code");
-    markVisible(target, child);
 
     // When
     const nearest = [nearestTarget(child), nearestTarget(code)];

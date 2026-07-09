@@ -66,7 +66,7 @@ function hasIrreversibleHiddenOwnStyle(element: Element): boolean {
 function hasIrreversibleHiddenContext(element: Element): boolean {
   let current: Element | null = element;
   while (current !== null) {
-    if (hasIrreversibleHiddenOwnStyle(current)) {
+    if (hasIrreversibleHiddenOwnStyle(current) || !hasVisibleRect(current)) {
       return true;
     }
     current = composedParent(current);
@@ -155,16 +155,13 @@ function scanRoot(root: Document | ShadowRoot, context: RootContext): HTMLElemen
           ? (parent?.editable ?? context.editable)
           : editableValue.toLowerCase() !== "false";
       const concealed =
-        (parent?.concealed ?? context.concealed) || hasIrreversibleHiddenOwnStyle(node);
+        (parent?.concealed ?? context.concealed) ||
+        hasIrreversibleHiddenOwnStyle(node) ||
+        !hasVisibleRect(node);
       const visibility = computedStyle(node)?.visibility;
       const styleHidden = concealed || visibility === "hidden" || visibility === "collapse";
       const candidate =
-        node instanceof HTMLElement &&
-        node.isConnected &&
-        !hardUnsafe &&
-        !editable &&
-        !styleHidden &&
-        hasVisibleRect(node)
+        node instanceof HTMLElement && node.isConnected && !hardUnsafe && !editable && !styleHidden
           ? node
           : undefined;
       const state: ScanState = {
@@ -175,12 +172,7 @@ function scanRoot(root: Document | ShadowRoot, context: RootContext): HTMLElemen
         hardUnsafe,
         editable,
         concealed,
-        ownMeaningfulText:
-          !hardUnsafe &&
-          !editable &&
-          !styleHidden &&
-          hasVisibleRect(node) &&
-          directTextIsMeaningful(node),
+        ownMeaningfulText: !hardUnsafe && !editable && !styleHidden && directTextIsMeaningful(node),
         hasMeaningfulText: false,
         represented: false,
         selected: false,

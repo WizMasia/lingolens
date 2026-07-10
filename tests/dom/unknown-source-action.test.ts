@@ -74,4 +74,40 @@ describe("unknown source action", () => {
     expect(text).toContain("원문 언어를 확인할 수 없습니다.");
     expect(opened).toBe(1);
   });
+
+  it("opens language selection from a hover-mode error with the trigger again", async () => {
+    const source = document.createElement("p");
+    source.textContent = "Brief";
+    document.body.append(source);
+    let opened = 0;
+    const menu: ElementMenu = {
+      async open(): Promise<ElementMenuResult> {
+        opened += 1;
+        return { kind: "cancel" };
+      },
+      announce() {},
+      destroy() {},
+    };
+    const engine: TranslationEngine = {
+      async translate() {
+        return { kind: "unknown-source" };
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      menu,
+      settings: { ...SETTINGS, displayMode: "hover" },
+    });
+
+    await controller.translateTarget(source);
+    await controller.translateTarget(source);
+
+    expect(opened).toBe(1);
+    expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
+  });
 });

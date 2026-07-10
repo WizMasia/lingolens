@@ -2,56 +2,30 @@ import type { ElementRecord, RecordLifecycle, TextSnapshot, TranslationView } fr
 
 type HoverEntry = {
   readonly record: ElementRecord;
-  readonly actionHost: HTMLElement;
-  readonly meta: HTMLElement;
-  readonly status: HTMLElement;
   originalLang: string | null;
   originalDir: string | null;
-  readonly originalTabIndex: string | null;
-  readonly ownsTabIndex: boolean;
   readonly enter: EventListener;
   readonly leave: EventListener;
   readonly focus: EventListener;
   readonly blur: EventListener;
+  readonly keydown: EventListener;
   readonly unregisterRestorer: () => void;
   pointerActive: boolean;
   focusActive: boolean;
-  suppressFocus: boolean;
   translated: boolean;
   appliedLang: string | null;
   appliedDir: string | null;
 };
 
-const HOVER_STYLES = `
-  :host { display: inline-block; margin-inline-start: var(--lt-space-2, 8px); }
-  :host([hidden]) { display: none; }
-  .surface { align-items: center; background: var(--lt-color-paper, #f7f4ec);
-    border: var(--lt-border, 1px solid rgb(23 32 27 / 12%));
-    border-radius: var(--lt-radius, 10px); color: var(--lt-color-ink, #17201b);
-    display: flex; gap: var(--lt-space-2, 8px); padding-inline: var(--lt-space-2, 8px); }
-  .meta, .status, button { font: var(--lt-font-size-caption, 0.75rem)/
-    var(--lt-line-height-control, 1.4) var(--lt-font-control, system-ui, sans-serif); }
-  .status { color: var(--lt-color-danger, #a33a32); }
-  button { background: transparent; border: 0; color: var(--lt-color-moss, #2f6d4f);
-    cursor: pointer; min-block-size: var(--lt-target-min, 44px);
-    min-inline-size: var(--lt-target-min, 44px); padding: 0; }
-  button:focus-visible { box-shadow: var(--lt-focus-ring, 0 0 0 2px #2f6d4f); outline: 0; }
-`;
-
-export const createHoverView = (
-  actions: Readonly<{ onAction(record: ElementRecord): void }> = { onAction: () => undefined },
-): TranslationView => {
+export const createHoverView = (): TranslationView => {
   const entries = new Map<ElementRecord, HoverEntry>();
 
   const restore = (record: ElementRecord): void => {
     const entry = entries.get(record);
     if (entry === undefined) return;
     restoreText(entry);
-    if (entry.ownsTabIndex)
-      restoreOwnedAttribute(record.source, "tabindex", "0", entry.originalTabIndex);
     removeListeners(entry);
     entry.unregisterRestorer();
-    entry.actionHost.remove();
     entries.delete(record);
   };
 
@@ -62,22 +36,26 @@ export const createHoverView = (
   };
 
   const mount = (record: ElementRecord): HoverEntry => {
-    const entry = createEntry(record, actions, (reason) =>
+    const entry = createEntry(record, (reason) =>
       reason === "inspect" ? restoreText(entry) : restore(record),
     );
     entries.set(record, entry);
     addListeners(entry);
-    record.source.after(entry.actionHost);
+    if (record.source.matches(":hover")) {
+      entry.pointerActive = true;
+    }
+    if (isFocused(record.source)) {
+      entry.focusActive = true;
+    }
+    if (entry.pointerActive || entry.focusActive) activate(entry);
     return entry;
   };
 
   return {
     render,
     markStale() {},
-    setError(record, message) {
-      const entry = entries.get(record) ?? mount(record);
-      entry.status.textContent = message;
-      entry.actionHost.hidden = false;
+    setError(record) {
+      restore(record);
     },
     restore,
     destroy() {
@@ -88,93 +66,43 @@ export const createHoverView = (
 
 const createEntry = (
   record: ElementRecord,
-  actions: Readonly<{ onAction(record: ElementRecord): void }>,
   onLifecycle: (reason: RecordLifecycle) => void,
 ): HoverEntry => {
-  const { host, meta, status, button } = createActionSurface(record.source.ownerDocument);
-  const originalTabIndex = record.source.getAttribute("tabindex");
-  const ownsTabIndex = record.source.tabIndex < 0;
-  if (ownsTabIndex) record.source.setAttribute("tabindex", "0");
   let entry: HoverEntry;
   entry = {
     record,
-    actionHost: host,
-    meta,
-    status,
     originalLang: record.source.getAttribute("lang"),
     originalDir: record.source.getAttribute("dir"),
-    originalTabIndex,
-    ownsTabIndex,
     enter: () => {
       entry.pointerActive = true;
       activate(entry);
     },
-    leave: (event) => {
+    leave: () => {
       entry.pointerActive = false;
-      if (!movesInto(entry.actionHost, event)) settle(entry);
+      settle(entry);
     },
     focus: () => {
-      if (entry.suppressFocus) {
-        entry.suppressFocus = false;
-        return;
-      }
       entry.focusActive = true;
       activate(entry);
     },
-    blur: (event) => {
+    blur: () => {
       entry.focusActive = false;
-      if (!movesInto(entry.actionHost, event)) settle(entry);
+      settle(entry);
+    },
+    keydown: (event) => {
+      if (!(event instanceof KeyboardEvent) || event.key !== "Escape") return;
+      entry.pointerActive = false;
+      entry.focusActive = false;
+      settle(entry);
     },
     unregisterRestorer: record.registerRestorer(onLifecycle),
     pointerActive: false,
     focusActive: false,
-    suppressFocus: false,
     translated: false,
     appliedLang: null,
     appliedDir: null,
   };
-  host.addEventListener("pointerleave", () => settle(entry));
-  host.addEventListener("focusout", () => settle(entry));
-  button.addEventListener("click", () => actions.onAction(record));
-  button.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    entry.pointerActive = false;
-    entry.focusActive = false;
-    entry.suppressFocus = true;
-    settle(entry);
-    record.source.focus();
-  });
   return entry;
-};
-
-const createActionSurface = (
-  document: Document,
-): Readonly<{
-  host: HTMLElement;
-  meta: HTMLElement;
-  status: HTMLElement;
-  button: HTMLButtonElement;
-}> => {
-  const host = document.createElement("span");
-  host.hidden = true;
-  host.setAttribute("data-local-translator-ui", "hover");
-  const shadow = host.attachShadow({ mode: "closed" });
-  const style = document.createElement("style");
-  style.textContent = HOVER_STYLES;
-  const surface = document.createElement("span");
-  surface.className = "surface";
-  const meta = document.createElement("span");
-  meta.className = "meta";
-  const status = document.createElement("span");
-  status.className = "status";
-  status.setAttribute("role", "status");
-  status.setAttribute("aria-live", "polite");
-  const button = document.createElement("button");
-  button.type = "button";
-  button.textContent = "Change language";
-  surface.append(meta, status, button);
-  shadow.append(style, surface);
-  return { host, meta, status, button };
 };
 
 const addListeners = (entry: HoverEntry): void => {
@@ -183,6 +111,7 @@ const addListeners = (entry: HoverEntry): void => {
   source.addEventListener("pointerleave", entry.leave);
   source.addEventListener("focus", entry.focus);
   source.addEventListener("blur", entry.blur);
+  source.addEventListener("keydown", entry.keydown);
 };
 
 const removeListeners = (entry: HoverEntry): void => {
@@ -191,6 +120,7 @@ const removeListeners = (entry: HoverEntry): void => {
   source.removeEventListener("pointerleave", entry.leave);
   source.removeEventListener("focus", entry.focus);
   source.removeEventListener("blur", entry.blur);
+  source.removeEventListener("keydown", entry.keydown);
 };
 
 const activate = (entry: HoverEntry): void => {
@@ -199,27 +129,23 @@ const activate = (entry: HoverEntry): void => {
   if (success === null || target === null || entry.record.phase === "stale") return;
   const hasPageChange = entry.record.currentSnapshot.some(({ node, value }) => node.data !== value);
   if (!entry.translated && hasPageChange) return;
-  if (!entry.translated) {
-    entry.originalLang = entry.record.source.getAttribute("lang");
-    entry.originalDir = entry.record.source.getAttribute("dir");
-    entry.record.beginViewOwnership();
-    for (const snapshot of entry.record.currentSnapshot) {
-      setViewText(entry.record, snapshot, snapshot === target ? success.text : "");
-    }
-    entry.appliedLang = success.targetLanguage;
-    entry.appliedDir = languageDirection(success.targetLanguage);
-    entry.record.source.lang = entry.appliedLang;
-    entry.record.source.dir = entry.appliedDir;
-    entry.translated = true;
+  if (entry.translated) return;
+  entry.originalLang = entry.record.source.getAttribute("lang");
+  entry.originalDir = entry.record.source.getAttribute("dir");
+  entry.record.beginViewOwnership();
+  for (const snapshot of entry.record.currentSnapshot) {
+    setViewText(entry.record, snapshot, snapshot === target ? success.text : "");
   }
-  entry.meta.textContent = `${success.sourceLanguage} → ${success.targetLanguage}`;
-  entry.actionHost.hidden = false;
+  entry.appliedLang = success.targetLanguage;
+  entry.appliedDir = languageDirection(success.targetLanguage);
+  entry.record.source.lang = entry.appliedLang;
+  entry.record.source.dir = entry.appliedDir;
+  entry.translated = true;
 };
 
 const settle = (entry: HoverEntry): void => {
   if (entry.pointerActive || entry.focusActive) return;
   restoreText(entry);
-  entry.actionHost.hidden = true;
 };
 
 const restoreText = (entry: HoverEntry): void => {
@@ -245,10 +171,9 @@ const setViewText = (record: ElementRecord, snapshot: TextSnapshot, value: strin
 const firstNonEmpty = (snapshots: readonly TextSnapshot[]): TextSnapshot | null =>
   snapshots.find(({ value }) => value.trim().length > 0) ?? null;
 
-const movesInto = (host: HTMLElement, event: Event): boolean => {
-  if (!("relatedTarget" in event)) return false;
-  const related = event.relatedTarget;
-  return related instanceof Node && (related === host || host.contains(related));
+const isFocused = (source: HTMLElement): boolean => {
+  const root = source.getRootNode();
+  return ("activeElement" in root && root.activeElement === source) || source.matches(":focus");
 };
 
 const restoreOwnedAttribute = (

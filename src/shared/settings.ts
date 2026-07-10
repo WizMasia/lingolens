@@ -29,12 +29,14 @@ const DEFAULT_TRIGGER: TriggerBinding = {
   shift: false,
 };
 
+const RESERVED_TRIGGER_KEYS = new Set(["escape", "tab", "enter"]);
+
 function isRecord(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseDisplayMode(value: unknown): DisplayMode {
-  return value === "hover" ? "hover" : "inline";
+  return value === "inline" ? "inline" : "hover";
 }
 
 function parseSource(value: unknown): SourcePreference {
@@ -78,6 +80,8 @@ function parseTrigger(value: unknown): TriggerBinding {
       ? value.key
       : DEFAULT_TRIGGER.key;
 
+  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key))) return DEFAULT_TRIGGER;
+
   return {
     key,
     ctrl: "ctrl" in value && typeof value.ctrl === "boolean" ? value.ctrl : DEFAULT_TRIGGER.ctrl,
@@ -95,7 +99,7 @@ export function resolveBrowserTarget(uiLanguage: string): string {
 export function parseSettings(value: unknown, uiLanguage: string): Settings {
   if (!isRecord(value)) {
     return {
-      displayMode: "inline",
+      displayMode: "hover",
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
       trigger: DEFAULT_TRIGGER,
@@ -103,7 +107,7 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
   }
 
   return {
-    displayMode: "displayMode" in value ? parseDisplayMode(value.displayMode) : "inline",
+    displayMode: "displayMode" in value ? parseDisplayMode(value.displayMode) : "hover",
     source: "source" in value ? parseSource(value.source) : { kind: "auto" },
     target:
       "target" in value

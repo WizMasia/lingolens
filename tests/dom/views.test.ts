@@ -174,6 +174,8 @@ describe("hover view", () => {
     // When
     source.dispatchEvent(event("pointerenter"));
     expect(source.textContent).toBe("안녕하세요");
+    expect(source.nextElementSibling).toBeNull();
+    expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
     source.dispatchEvent(event("pointerleave"));
 
     // Then
@@ -213,6 +215,39 @@ describe("hover view", () => {
 
     // Then
     expect(source.textContent).toBe("Hello careful world");
+  });
+
+  it("activates immediately when the translation resolves under the pointer", () => {
+    const source = sourceFixture();
+    const matches = source.matches.bind(source);
+    vi.spyOn(source, "matches").mockImplementation((selector) =>
+      selector === ":hover" ? true : matches(selector),
+    );
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+
+    createHoverView().render(record);
+
+    expect(source.textContent).toBe("Bonjour");
+    expect(source.nextElementSibling).toBeNull();
+  });
+
+  it("activates immediately when a source in an open shadow root is focused", () => {
+    const host = document.createElement("section");
+    const root = host.attachShadow({ mode: "open" });
+    const source = document.createElement("p");
+    source.tabIndex = 0;
+    source.textContent = "Hello";
+    root.append(source);
+    document.body.append(host);
+    source.focus();
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+
+    createHoverView().render(record);
+
+    expect(source.textContent).toBe("Bonjour");
+    expect(source.nextElementSibling).toBeNull();
   });
 
   it("restores an active replacement immediately during destroy", () => {
@@ -285,7 +320,7 @@ describe("hover view", () => {
     expect(source.lang).toBe("de");
   });
 
-  it("keeps active success visible on error and announces it", () => {
+  it("restores the source without inserting hover UI when a translation errors", () => {
     // Given
     const source = sourceFixture("Hello");
     const record = createRecordStore().getOrCreate(source);
@@ -299,46 +334,46 @@ describe("hover view", () => {
     view.setError(record, "Translation unavailable");
 
     // Then
-    expect(source.textContent).toBe("Bonjour");
-    expect(ownedShadow("hover").textContent).toContain("Translation unavailable");
+    expect(source.textContent).toBe("Hello");
+    expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
   });
 
-  it("invokes hover actions only from its closed-shadow button", () => {
+  it("does not insert a hover control after rendering a translation", () => {
     // Given
     const source = sourceFixture("Hello");
     const record = createRecordStore().getOrCreate(source);
     record.complete("Bonjour", "en", "fr");
-    const onAction = vi.fn();
-    createHoverView({ onAction }).render(record);
-    source.dispatchEvent(event("pointerenter"));
-    expect(ownedShadow("hover").querySelector("style")?.textContent).toContain(":host([hidden])");
-
-    // When
-    source.dispatchEvent(event("local-translator-action"));
-    expect(onAction).not.toHaveBeenCalled();
-    ownedShadow("hover").querySelector<HTMLButtonElement>("button")?.click();
+    createHoverView().render(record);
 
     // Then
-    expect(onAction).toHaveBeenCalledWith(record);
+    expect(source.nextElementSibling).toBeNull();
+    expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
   });
 
-  it("dismisses an active hover action with Escape", () => {
+  it("does not add a tab stop to a source that was not focusable", () => {
+    const source = sourceFixture("Hello");
+    source.removeAttribute("tabindex");
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+
+    createHoverView().render(record);
+
+    expect(source.getAttribute("tabindex")).toBeNull();
+  });
+
+  it("restores an active hover translation with Escape without inserting UI", () => {
     // Given
     const source = sourceFixture("Hello");
     const record = createRecordStore().getOrCreate(source);
     record.complete("Bonjour", "en", "fr");
     createHoverView().render(record);
     source.dispatchEvent(event("pointerenter"));
-    const button = ownedShadow("hover").querySelector<HTMLButtonElement>("button");
-    if (button === null) throw new Error("fixture action missing");
 
     // When
-    button.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    source.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 
     // Then
     expect(source.textContent).toBe("Hello");
-    expect(document.querySelector<HTMLElement>('[data-local-translator-ui="hover"]')?.hidden).toBe(
-      true,
-    );
+    expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
   });
 });

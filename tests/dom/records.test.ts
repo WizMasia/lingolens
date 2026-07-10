@@ -183,14 +183,14 @@ describe("element records", () => {
     "remove",
     "clear",
     "destroy",
-  ] as const)("restores an injected tabindex during %s cleanup", (cleanup) => {
+  ] as const)("does not inject a tabindex during %s cleanup", (cleanup) => {
     const store = createRecordStore();
     const source = sourceFixture("Hello");
     const record = store.getOrCreate(source);
     record.complete("Bonjour", "en", "fr");
     const view = createHoverView();
     view.render(record);
-    expect(source.getAttribute("tabindex")).toBe("0");
+    expect(source.hasAttribute("tabindex")).toBe(false);
 
     switch (cleanup) {
       case "stale":
@@ -225,7 +225,7 @@ describe("element records", () => {
     expect([source.lang, source.dir]).toEqual(["de", "auto"]);
   });
 
-  it("preserves a page-owned tabindex change during cleanup", () => {
+  it("preserves a page-owned tabindex during cleanup", () => {
     const source = sourceFixture("Hello");
     const record = createRecordStore().getOrCreate(source);
     record.complete("Bonjour", "en", "fr");

@@ -128,6 +128,35 @@ describe("per-element retranslation", () => {
     expect(sourceSelect).not.toBeUndefined();
   });
 
+  it("cancels on a key-shaped Escape event", async () => {
+    // Given
+    const source = sourceFixture();
+    source.tabIndex = 0;
+    source.focus();
+    const menu = createElementMenu(document, LANGUAGES);
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    if (host === null) throw new Error("fixture menu missing");
+    const sourceSelect = shadowRoots
+      .get(host)
+      ?.querySelector<HTMLSelectElement>('select[name="source"]');
+    if (sourceSelect === null || sourceSelect === undefined) {
+      throw new Error("fixture source select missing");
+    }
+    const escapeEvent = new Event("keydown", { bubbles: true });
+    Object.defineProperty(escapeEvent, "key", { value: "Escape" });
+
+    // When
+    sourceSelect.dispatchEvent(escapeEvent);
+    const remainingHost = document.querySelector('[data-local-translator-ui="element-menu"]');
+    menu.destroy();
+
+    // Then
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+    expect(remainingHost).toBeNull();
+    expect(document.activeElement).toBe(source);
+  });
+
   it("renders the menu in a fixed body overlay without inserting beside the source", async () => {
     // Given
     const container = document.createElement("section");

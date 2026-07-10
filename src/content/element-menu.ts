@@ -158,13 +158,14 @@ const wireControls = (
   });
   controls.restore.addEventListener("click", () => finish({ kind: "restore" }));
   shadow.addEventListener("keydown", (event) => {
-    if (!(event instanceof KeyboardEvent)) return;
-    if (event.key !== "Escape") return;
+    if (!isEscapeKey(event)) return;
     event.preventDefault();
     finish({ kind: "cancel" });
     anchor.focus();
   });
 };
+
+const isEscapeKey = (event: Event): boolean => "key" in event && event.key === "Escape";
 
 const appendLanguages = (
   select: HTMLSelectElement,

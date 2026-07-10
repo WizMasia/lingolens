@@ -6,7 +6,7 @@
 - Extension build: `dist/` produced from `codex/local-page-translator`.
 - Automated Chrome control: unavailable because the installed ChatGPT Chrome Extension did not establish a browser-control session, despite Chrome and the helper extension being installed and enabled.
 - Automated regression suite: 129 tests across 20 files, 230 assertions.
-- Headless unpacked-extension smoke test: Chrome accepted `dist/` and started `chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js`.
+- Headless unpacked-extension smoke test: inconclusive. Chrome 149 did not expose this extension's `background.js`; the observed `service_worker.js` belonged to a built-in Google extension and is not evidence that `dist/` loaded.
 
 ## Hypothesis 1: Model initialization loses visible progress
 
@@ -78,8 +78,8 @@
 - Every production TypeScript file remains at or below 250 non-blank, non-comment lines.
 - Source audit found no `any`, TypeScript suppression, non-null assertion, remote URL, dynamic evaluation, or unsafe HTML assignment in production TypeScript.
 - Popup and options build HTML/CSS were rendered through Chrome at 380×480 and 980×900. Both surfaces showed readable Korean text, visible controls, no clipping, and no overlapping layout. The popup included active display-mode and target-language status.
-- Direct headless navigation to extension HTML returned Chromium's development-extension content-verification error, so those screenshots used the exact built HTML/CSS through Chrome document injection. Extension loadability was independently proven by the running service worker.
+- Direct headless navigation to extension HTML returned Chromium's development-extension content-verification error, so those screenshots used the exact built HTML/CSS through Chrome document injection. They verify layout only, not unpacked-extension loadability.
 
 ## Outstanding Manual Evidence
 
-An interactive Chrome session must still verify native API exposure in the content-script isolated world, first-use model download/user activation, real translation output, popup persistence, offline reuse, and inline/hover behavior on a live page. Automated browser control cannot currently attach to the user's Chrome session, and the headless environment cannot provide a trustworthy installed-model/offline acceptance pass.
+An interactive Chrome session must still verify unpacked loading, background/content entry startup, native API exposure in the content-script isolated world, first-use model download/user activation, real translation output, popup persistence, offline reuse, and inline/hover behavior on a live page. Automated browser control cannot currently attach to the user's Chrome session, and the headless environment cannot provide a trustworthy extension-load or installed-model/offline acceptance pass.

@@ -85,6 +85,27 @@ describe("stale page content", () => {
     );
   });
 
+  it("marks only the nearest translated source stale when a nested source changes", async () => {
+    // Given
+    const outer = document.createElement("section");
+    outer.append("Outer ");
+    const inner = document.createElement("p");
+    inner.textContent = "Inner";
+    outer.append(inner);
+    document.body.append(outer);
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.translateTarget(outer);
+    await controller.translateTarget(inner);
+
+    // When
+    inner.firstChild?.replaceWith(document.createTextNode("Updated inner source"));
+    await flushMutations();
+
+    // Then
+    expect(controller.store.getOrCreate(inner).phase).toBe("stale");
+    expect(controller.store.getOrCreate(outer).phase).toBe("translated");
+  });
+
   it("ignores extension-owned UI changes", async () => {
     // Given
     const source = document.createElement("p");

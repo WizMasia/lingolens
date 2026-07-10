@@ -71,16 +71,16 @@ const inspectMutations = (
   const changed = new Set<ElementRecord>();
   for (const mutation of mutations) {
     if (isExtensionMutation(mutation)) continue;
-    for (const record of recordsContaining(store.active, mutation.target)) {
-      if (
-        mutation.type === "characterData" &&
-        mutation.target instanceof Text &&
-        record.isViewMutation(mutation.target)
-      ) {
-        continue;
-      }
-      changed.add(record);
+    const record = nearestRecordContaining(store.active, mutation.target);
+    if (record === null) continue;
+    if (
+      mutation.type === "characterData" &&
+      mutation.target instanceof Text &&
+      record.isViewMutation(mutation.target)
+    ) {
+      continue;
     }
+    changed.add(record);
   }
   for (const record of changed) {
     record.restoreView("inspect");
@@ -93,11 +93,17 @@ const inspectMutations = (
   sync();
 };
 
-const recordsContaining = (
+const nearestRecordContaining = (
   records: ReadonlySet<ElementRecord>,
   node: Node,
-): readonly ElementRecord[] =>
-  [...records].filter((record) => record.source === node || record.source.contains(node));
+): ElementRecord | null => {
+  let nearest: ElementRecord | null = null;
+  for (const record of records) {
+    if (record.source !== node && !record.source.contains(node)) continue;
+    if (nearest === null || nearest.source.contains(record.source)) nearest = record;
+  }
+  return nearest;
+};
 
 const removeDisconnected = (store: RecordStore): void => {
   for (const record of [...store.active]) {

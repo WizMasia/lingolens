@@ -52,6 +52,14 @@ progress::-webkit-progress-value {
   color: var(--lt-color-danger);
   font-size: var(--lt-font-size-caption);
 }
+.active-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lt-space-1) var(--lt-space-3);
+  margin-block-start: var(--lt-space-2);
+  color: rgb(23 32 27 / 66%);
+  font-size: var(--lt-font-size-caption);
+}
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

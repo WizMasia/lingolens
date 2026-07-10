@@ -2,6 +2,7 @@ import { Window } from "happy-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPopupApp, type PopupDependencies } from "../../src/popup/popup";
 import type { RuntimeMessage, TabState } from "../../src/shared/protocol";
+import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
 Object.defineProperties(globalThis, {
@@ -26,6 +27,13 @@ const fixture = (): PopupDependencies & { sent: RuntimeMessage[] } => {
   return {
     sent,
     getState: async () => state(),
+    getSettings: async () =>
+      ({
+        displayMode: "hover",
+        source: { kind: "auto" },
+        target: { kind: "fixed", language: "ja" },
+        trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
+      }) satisfies Settings,
     sendToActiveTab: async (message) => {
       sent.push(message);
     },
@@ -37,7 +45,7 @@ describe("popup", () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <main><p id="status"></p><progress id="progress"></progress>
-      <p id="counts"></p><p id="error"></p>
+      <p id="counts"></p><p id="active-mode"></p><p id="active-target"></p><p id="error"></p>
       <button id="translate-page"></button><button id="restore-page"></button>
       <button id="open-options"></button></main>`;
   });
@@ -72,5 +80,13 @@ describe("popup", () => {
     document.querySelector<HTMLButtonElement>("#translate-page")?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.querySelector("#error")?.textContent).toContain("지원되지 않는 페이지");
+  });
+
+  it("shows the active display mode and target language", async () => {
+    const dependencies = fixture();
+    const app = createPopupApp(document, dependencies);
+    await app.ready;
+    expect(document.querySelector("#active-mode")?.textContent).toContain("호버");
+    expect(document.querySelector("#active-target")?.textContent).toContain("일본어");
   });
 });

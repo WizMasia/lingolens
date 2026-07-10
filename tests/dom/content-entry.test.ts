@@ -1,7 +1,7 @@
 import { Window } from "happy-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranslationController } from "../../src/content/controller";
-import { createContentApp } from "../../src/content/index";
+import { createContentApp, productionLanguages } from "../../src/content/index";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -103,5 +103,11 @@ describe("content entry", () => {
     expect(controller.translatePage).toHaveBeenCalledOnce();
     expect(controller.restorePage).toHaveBeenCalledOnce();
     expect(controller.applySettings).toHaveBeenCalledWith(hoverSettings);
+  });
+
+  it("provides the production controller with the full language catalog", () => {
+    const languages = productionLanguages();
+    expect(languages.length).toBeGreaterThan(10);
+    expect(languages).toContainEqual({ value: "ja", label: "일본어" });
   });
 });

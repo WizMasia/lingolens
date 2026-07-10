@@ -1,9 +1,12 @@
+import { LANGUAGE_CHOICES } from "../shared/languages";
 import { parseMessage, type RuntimeMessage, type TabState } from "../shared/protocol";
+import type { Settings } from "../shared/settings";
 
 const UNSUPPORTED = "지원되지 않는 페이지입니다. 일반 웹페이지에서 다시 시도해 주세요.";
 
 export type PopupDependencies = {
   getState(): Promise<TabState>;
+  getSettings(): Promise<Settings>;
   sendToActiveTab(message: RuntimeMessage): Promise<void>;
   openOptions(): void;
 };
@@ -14,6 +17,8 @@ export const createPopupApp = (document: Document, dependencies: PopupDependenci
   const status = required(document, "status", HTMLParagraphElement);
   const progress = required(document, "progress", HTMLProgressElement);
   const counts = required(document, "counts", HTMLParagraphElement);
+  const activeMode = required(document, "active-mode", HTMLParagraphElement);
+  const activeTarget = required(document, "active-target", HTMLParagraphElement);
   const error = required(document, "error", HTMLParagraphElement);
   const translate = required(document, "translate-page", HTMLButtonElement);
   const restore = required(document, "restore-page", HTMLButtonElement);
@@ -45,8 +50,24 @@ export const createPopupApp = (document: Document, dependencies: PopupDependenci
   restore.addEventListener("click", () => void run({ type: "restore-page" }));
   options.addEventListener("click", dependencies.openOptions);
 
-  return { ready: dependencies.getState().then(render) };
+  const renderSettings = (settings: Settings): void => {
+    activeMode.textContent = `표시: ${settings.displayMode === "inline" ? "원문 아래" : "호버 시 교체"}`;
+    const target =
+      settings.target.kind === "fixed"
+        ? settings.target.language
+        : settings.target.resolvedLanguage;
+    activeTarget.textContent = `도착 언어: ${languageLabel(target)}`;
+  };
+  return {
+    ready: Promise.all([
+      dependencies.getState().then(render),
+      dependencies.getSettings().then(renderSettings),
+    ]).then(() => undefined),
+  };
 };
+
+const languageLabel = (value: string): string =>
+  LANGUAGE_CHOICES.find((language) => language.value === value)?.label ?? value;
 
 const phaseLabel = (phase: TabState["phase"]): string => {
   switch (phase) {
@@ -87,6 +108,11 @@ if (typeof chrome !== "undefined") {
       return message?.type === "tab-state"
         ? message.state
         : { phase: "idle", completed: 0, total: 0, skipped: 0, failed: 0 };
+    },
+    async getSettings() {
+      const stored = await chrome.storage.sync.get("settings");
+      const { parseSettings } = await import("../shared/settings");
+      return parseSettings(stored["settings"], chrome.i18n.getUILanguage());
     },
     async sendToActiveTab(message) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

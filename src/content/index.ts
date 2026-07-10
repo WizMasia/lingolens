@@ -1,3 +1,4 @@
+import { LANGUAGE_CHOICES } from "../shared/languages";
 import { parseMessage } from "../shared/protocol";
 import { matchesTrigger, parseSettings, type Settings } from "../shared/settings";
 import { createTranslationEngine } from "./ai-engine";
@@ -14,6 +15,8 @@ export type ContentApp = Readonly<{
   handleMessage(value: unknown): Promise<unknown> | unknown;
   destroy(): void;
 }>;
+
+export const productionLanguages = () => LANGUAGE_CHOICES;
 
 export const createContentApp = (
   document: Document,
@@ -102,6 +105,7 @@ if (typeof chrome !== "undefined") {
     const controller = createTranslationController({
       document,
       engine: createTranslationEngine(adapter),
+      languages: productionLanguages(),
       settings,
       onState(state) {
         void chrome.runtime.sendMessage({ type: "tab-state", state });

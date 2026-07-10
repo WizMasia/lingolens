@@ -190,6 +190,30 @@ describe("targeted translation", () => {
     ).toBeLessThanOrEqual(160);
   });
 
+  it("excludes unsafe descendant and nearby text from the translation request", async () => {
+    // Given
+    const parent = document.createElement("section");
+    parent.innerHTML = `
+      <p id="context">Visible context <code>contextSecret()</code></p>
+      <p id="source">Visible source <code>sourceSecret()</code><span hidden>hiddenSecret</span>
+        <span contenteditable="true">draftSecret</span></p>`;
+    document.body.append(parent);
+    const source = document.querySelector<HTMLElement>("#source");
+    if (source === null) throw new Error("fixture source missing");
+    const { engine, requests } = engineFixture();
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.translateTarget(source);
+
+    // Then
+    expect(requests[0]?.text).toBe("Visible source");
+    const request = requests[0];
+    expect(request?.source.kind === "auto" ? request.source.context : undefined).toBe(
+      "Visible context",
+    );
+  });
+
   it("omits a malformed ancestor language hint", async () => {
     // Given
     const parent = document.createElement("section");

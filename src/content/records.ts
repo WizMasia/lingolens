@@ -1,3 +1,5 @@
+import { collectSourceTextNodes } from "./targets";
+
 export const RECORD_PHASES = [
   "idle",
   "queued",
@@ -240,15 +242,5 @@ export const createRecordStore = (): RecordStore => {
 };
 
 const snapshotText = (source: HTMLElement): readonly TextSnapshot[] => {
-  const snapshots: TextSnapshot[] = [];
-  const walker = source.ownerDocument.createTreeWalker(source, 4);
-  const TextConstructor = source.ownerDocument.defaultView?.Text;
-  let node = walker.nextNode();
-  while (node !== null) {
-    if (TextConstructor !== undefined && node instanceof TextConstructor) {
-      snapshots.push({ node, value: node.data });
-    }
-    node = walker.nextNode();
-  }
-  return snapshots;
+  return collectSourceTextNodes(source).map((node) => ({ node, value: node.data }));
 };

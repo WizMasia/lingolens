@@ -10,9 +10,20 @@ Object.defineProperties(globalThis, {
   CustomEvent: { configurable: true, value: testWindow.CustomEvent },
   Element: { configurable: true, value: testWindow.Element },
   Event: { configurable: true, value: testWindow.Event },
+  HTMLElement: { configurable: true, value: testWindow.HTMLElement },
   KeyboardEvent: { configurable: true, value: testWindow.KeyboardEvent },
   Node: { configurable: true, value: testWindow.Node },
+  ShadowRoot: { configurable: true, value: testWindow.ShadowRoot },
+  Text: { configurable: true, value: testWindow.Text },
   document: { configurable: true, value: testWindow.document },
+});
+Object.defineProperty(testWindow.HTMLElement.prototype, "getClientRects", {
+  configurable: true,
+  value: () => [new testWindow.DOMRect(0, 0, 100, 20)],
+});
+Object.defineProperty(testWindow, "getComputedStyle", {
+  configurable: true,
+  value: () => ({ display: "block", opacity: "1", visibility: "visible" }),
 });
 const event = (type: string): Event => new Event(type);
 const shadowRoots = new WeakMap<Element, ShadowRoot>();
@@ -171,6 +182,24 @@ describe("hover view", () => {
 
     // Then
     expect(source.innerHTML).toBe(original);
+  });
+
+  it("leaves excluded descendant text untouched during hover replacement", () => {
+    // Given
+    const source = sourceFixture(
+      "Visible <code>secret()</code><span hidden>hidden secret</span><span contenteditable='true'>draft secret</span>",
+    );
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("번역됨", "en", "ko");
+    createHoverView().render(record);
+
+    // When
+    source.dispatchEvent(event("pointerenter"));
+
+    // Then
+    expect(source.querySelector("code")?.textContent).toBe("secret()");
+    expect(source.querySelector("[hidden]")?.textContent).toBe("hidden secret");
+    expect(source.querySelector("[contenteditable]")?.textContent).toBe("draft secret");
   });
 
   it("activates and restores from keyboard focus", () => {

@@ -24,7 +24,10 @@ function composedParent(element: Element): Element | null {
   }
 
   const root = element.getRootNode();
-  return root instanceof ShadowRoot ? root.host : null;
+  const ShadowRootConstructor = element.ownerDocument.defaultView?.ShadowRoot;
+  return ShadowRootConstructor !== undefined && root instanceof ShadowRootConstructor
+    ? root.host
+    : null;
 }
 
 function hasHardUnsafeContext(element: Element): boolean {
@@ -101,29 +104,35 @@ function directTextIsMeaningful(element: Element): boolean {
   return MEANINGFUL_TEXT.test(parts.join(" "));
 }
 
-export function collectSourceText(element: HTMLElement): string {
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const parts: string[] = [];
+export function collectSourceTextNodes(element: HTMLElement): readonly Text[] {
+  const walker = element.ownerDocument.createTreeWalker(element, 4);
+  const TextConstructor = element.ownerDocument.defaultView?.Text;
+  const nodes: Text[] = [];
   let node = walker.nextNode();
 
   while (node !== null) {
     const parent = node.parentElement;
-    const normalized = node.textContent?.replace(/\s+/gu, " ").trim();
     if (
+      TextConstructor !== undefined &&
+      node instanceof TextConstructor &&
       parent !== null &&
       !hasUnsafeContext(parent) &&
       !hasHiddenStyleContext(parent) &&
-      hasVisibleRect(parent) &&
-      normalized !== undefined &&
-      normalized.length > 0
+      hasVisibleRect(parent)
     ) {
-      parts.push(normalized);
+      nodes.push(node);
     }
     node = walker.nextNode();
   }
 
-  return parts.join(" ");
+  return nodes;
 }
+
+export const collectSourceText = (element: HTMLElement): string =>
+  collectSourceTextNodes(element)
+    .map((node) => node.data.replace(/\s+/gu, " ").trim())
+    .filter((value) => value.length > 0)
+    .join(" ");
 
 export function isEligibleElement(element: Element): element is HTMLElement {
   return (

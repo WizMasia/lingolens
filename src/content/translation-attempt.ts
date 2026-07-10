@@ -7,6 +7,7 @@ import {
   type TranslationResult,
 } from "./ai-engine";
 import type { ElementRecord, RecordStore, TranslationView } from "./records";
+import { collectSourceText } from "./targets";
 
 export type TranslationAttempt = Readonly<{
   source: HTMLElement;
@@ -137,12 +138,13 @@ const nearestLanguage = (source: HTMLElement): string | undefined => {
 
 const nearbyContext = (source: HTMLElement, sourceText: string): string => {
   const candidates = [
-    source.previousElementSibling?.textContent,
-    source.nextElementSibling?.textContent,
-    source.parentElement?.textContent,
-  ];
-  return candidates
-    .flatMap((value) => (value === null || value === undefined ? [] : [value]))
+    source.previousElementSibling,
+    source.nextElementSibling,
+    source.parentElement,
+  ]
+    .filter((element): element is HTMLElement => element instanceof HTMLElement)
+    .map((element) => collectSourceText(element).replace(sourceText, "").trim());
+  return [...new Set(candidates)]
     .map((value) => value.replace(/\s+/gu, " ").trim())
     .filter((value) => value.length > 0 && value !== sourceText)
     .join(" ")

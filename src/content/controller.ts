@@ -170,7 +170,11 @@ export const createTranslationController = (
         return;
       }
       const record = store.getOrCreate(target);
-      if (record.lastSuccess !== null || record.phase === "error") {
+      if (record.lastSuccess !== null) {
+        restoreElement(target);
+        return;
+      }
+      if (record.phase === "error") {
         await openMenu(record);
         return;
       }

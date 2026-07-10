@@ -6,6 +6,7 @@ import type {
   TranslationResult,
 } from "../../src/content/ai-engine";
 import { createTranslationController } from "../../src/content/controller";
+import type { ElementMenu, ElementMenuResult } from "../../src/content/element-menu";
 import { createRecordStore } from "../../src/content/records";
 import type { Settings } from "../../src/shared/settings";
 
@@ -160,6 +161,31 @@ describe("targeted translation", () => {
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
     expect(host).not.toBeNull();
     expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("restores a successful target on a repeated primary translation", async () => {
+    // Given
+    const source = sourceFixture("Hello");
+    let opened = 0;
+    const menu: ElementMenu = {
+      async open(): Promise<ElementMenuResult> {
+        opened += 1;
+        return { kind: "cancel" };
+      },
+      announce() {},
+      destroy() {},
+    };
+    const { engine } = engineFixture();
+    const controller = createTranslationController({ document, engine, menu, settings: SETTINGS });
+
+    // When
+    await controller.translateTarget(source);
+    await controller.translateTarget(source);
+
+    // Then
+    expect(controller.store.active).toHaveLength(0);
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    expect(opened).toBe(0);
   });
 
   it("canonicalizes the ancestor language hint and bounds nearby context", async () => {

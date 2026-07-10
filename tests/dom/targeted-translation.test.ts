@@ -179,12 +179,12 @@ describe("targeted translation", () => {
     await controller.translateTarget(source);
 
     // Then
-    expect(requests[0]?.source).toEqual({
-      kind: "auto",
-      languageHint: "en",
-      context: expect.any(String),
-    });
     const request = requests[0];
+    expect(request?.source.kind).toBe("auto");
+    expect(request?.source.kind === "auto" ? request.source.languageHint : undefined).toBe("en");
+    expect(request?.source.kind === "auto" ? typeof request.source.context : undefined).toBe(
+      "string",
+    );
     expect(
       request?.source.kind === "auto" ? request.source.context?.length : undefined,
     ).toBeLessThanOrEqual(160);

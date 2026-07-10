@@ -98,6 +98,34 @@ describe("bounded page jobs", () => {
     expect(peak).toBe(3);
   });
 
+  it("caps an explicit concurrency request above three", async () => {
+    // Given
+    const gates = Array.from({ length: 5 }, () => deferred<PageJobOutcome>());
+    let active = 0;
+    let peak = 0;
+    const job = runPageJob(
+      gates,
+      async (gate) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        const outcome = await gate.promise;
+        active -= 1;
+        return outcome;
+      },
+      () => undefined,
+      new AbortController().signal,
+      4,
+    );
+    await Promise.resolve();
+
+    // When
+    for (const gate of gates) gate.resolve("translated");
+    await job;
+
+    // Then
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+
   it("counts every terminal outcome and reports progress after each element", async () => {
     // Given
     const progress: number[] = [];

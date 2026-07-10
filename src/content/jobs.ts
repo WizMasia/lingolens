@@ -22,7 +22,7 @@ export const runPageJob = async <Target>(
 ): Promise<PageJobSummary> => {
   let nextIndex = 0;
   const counts: PageJobCounts = { translated: 0, skipped: 0, failed: 0 };
-  const workerCount = Math.max(1, Math.floor(concurrency));
+  const workerCount = Math.min(3, Math.max(1, Math.floor(concurrency)));
 
   const runWorker = async (): Promise<void> => {
     while (!signal.aborted && nextIndex < targets.length) {

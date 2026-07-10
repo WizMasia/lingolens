@@ -154,3 +154,58 @@ logging; no forbidden escapes were found. The two focused regressions prove
 that a completed restore leaves no active records or translation UI after the
 pending promise settles, and that an unchanged-source observer inspection keeps
 hover translation available for a later pointer entry.
+
+## Review recovery: explicit concurrency cap
+
+The final review identified that `runPageJob` normalized a requested worker
+count only to a minimum of one. A caller could therefore request four workers,
+which violated Task 7's three-worker upper bound.
+
+### Runtime debugging audit
+
+1. The default worker configuration might already be unsafe. The existing
+   default-concurrency regression passed, so the default value remained bounded
+   at three.
+2. A caller-provided value might bypass the worker limit. A direct
+   `runPageJob(..., 4)` reproduction peaked at four active workers, isolating
+   the fault to the job runner rather than the controller.
+3. The worker pool length might not be the actual scheduling limit. After the
+   clamp, the same direct reproduction and the controller-focused page suite
+   passed, confirming the pool length is the operative concurrency boundary.
+
+### RED evidence
+
+The new focused regression calls `runPageJob` with `concurrency: 4` and tracks
+the maximum number of active async workers. Before the source edit:
+
+```text
+bun test tests/dom/page-jobs.test.ts
+Expected: <= 3
+Received: 4
+9 pass
+1 fail
+```
+
+### GREEN fix and verification
+
+`src/content/jobs.ts` now normalizes the worker count with a lower bound of one
+and an upper bound of three. The regression uses production scheduling rather
+than mocks and confirms that an explicit value above three cannot start more
+than three workers.
+
+```text
+bun test tests/dom/page-jobs.test.ts tests/dom/stale-content.test.ts
+20 pass, 0 fail
+
+bun test
+109 pass, 0 fail
+
+bun run check
+exit 0
+
+bun run build
+exit 0
+
+git diff --check
+exit 0
+```

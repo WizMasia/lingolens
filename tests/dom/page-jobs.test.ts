@@ -164,6 +164,32 @@ describe("full-page controller", () => {
     expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
   });
 
+  it("does not publish tab state while the content app is shutting down", () => {
+    const states: string[] = [];
+    const engine: TranslationEngine = {
+      async translate() {
+        return translated("unused");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      settings: SETTINGS,
+      onState(state) {
+        states.push(state.phase);
+      },
+    });
+
+    controller.destroy();
+
+    expect(states).toEqual([]);
+    expect(controller.getState().phase).toBe("idle");
+  });
+
   it("does not resurrect a pending retranslation after page restoration", async () => {
     // Given
     const [source] = addSources("One");

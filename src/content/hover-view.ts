@@ -90,7 +90,7 @@ const createEntry = (
       settle(entry);
     },
     keydown: (event) => {
-      if (!(event instanceof KeyboardEvent) || event.key !== "Escape") return;
+      if (!("key" in event) || event.key !== "Escape") return;
       entry.pointerActive = false;
       entry.focusActive = false;
       settle(entry);
@@ -112,6 +112,7 @@ const addListeners = (entry: HoverEntry): void => {
   source.addEventListener("focus", entry.focus);
   source.addEventListener("blur", entry.blur);
   source.addEventListener("keydown", entry.keydown);
+  source.ownerDocument.addEventListener("keydown", entry.keydown, true);
 };
 
 const removeListeners = (entry: HoverEntry): void => {
@@ -121,6 +122,7 @@ const removeListeners = (entry: HoverEntry): void => {
   source.removeEventListener("focus", entry.focus);
   source.removeEventListener("blur", entry.blur);
   source.removeEventListener("keydown", entry.keydown);
+  source.ownerDocument.removeEventListener("keydown", entry.keydown, true);
 };
 
 const activate = (entry: HoverEntry): void => {

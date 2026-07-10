@@ -43,13 +43,15 @@ export const createPageController = (dependencies: PageControllerDependencies): 
     dependencies.onState(next);
   };
 
-  const restorePage = (): void => {
+  const reset = (notify: boolean): void => {
     activeJob?.abort();
     activeJob = null;
     records.disconnect();
     dependencies.store.clear();
-    publish(IDLE_STATE);
+    if (notify) publish(IDLE_STATE);
   };
+
+  const restorePage = (): void => reset(true);
 
   const run = async (job: AbortController): Promise<void> => {
     if (job.signal.aborted) return;
@@ -85,7 +87,9 @@ export const createPageController = (dependencies: PageControllerDependencies): 
     syncRecords() {
       records.sync();
     },
-    destroy: restorePage,
+    destroy() {
+      reset(false);
+    },
   };
 };
 

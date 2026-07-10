@@ -376,4 +376,31 @@ describe("hover view", () => {
     expect(source.textContent).toBe("Hello");
     expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
   });
+
+  it("restores an active hover translation for an Escape event from another realm", () => {
+    const source = sourceFixture("Hello");
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+    createHoverView().render(record);
+    source.dispatchEvent(event("pointerenter"));
+    const escapeEvent = new Event("keydown");
+    Object.defineProperty(escapeEvent, "key", { value: "Escape" });
+
+    source.dispatchEvent(escapeEvent);
+
+    expect(source.textContent).toBe("Hello");
+  });
+
+  it("restores an active hover translation when Escape targets the document", () => {
+    const source = sourceFixture("Hello");
+    const record = createRecordStore().getOrCreate(source);
+    record.complete("Bonjour", "en", "fr");
+    createHoverView().render(record);
+    source.dispatchEvent(event("pointerenter"));
+    const escapeEvent = new KeyboardEvent("keydown", { key: "Escape" });
+
+    document.dispatchEvent(escapeEvent);
+
+    expect(source.textContent).toBe("Hello");
+  });
 });

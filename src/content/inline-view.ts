@@ -17,6 +17,7 @@ type InlineEntry = Readonly<{
 }>;
 
 const UI_ATTRIBUTE = "data-local-translator-ui";
+const STALE_NOTICE = "원문이 변경되었습니다. 다시 번역해 주세요.";
 
 const INLINE_STYLES = `
   :host {
@@ -63,7 +64,19 @@ export const createInlineView = (
     if (success === null) return;
     let entry = entries.get(record);
     if (entry === undefined) {
-      const onLifecycle = (): void => restore(record);
+      const onLifecycle = (reason: RecordLifecycle): void => {
+        switch (reason) {
+          case "inspect":
+            return;
+          case "stale":
+          case "remove":
+          case "clear":
+            restore(record);
+            return;
+          default:
+            assertNever(reason);
+        }
+      };
       entry = createEntry(document, record, actions, onLifecycle);
     }
     if (!entries.has(record)) {
@@ -81,6 +94,22 @@ export const createInlineView = (
 
   return {
     render,
+    markStale(record) {
+      const success = record.lastSuccess;
+      if (success === null) return;
+      let entry = entries.get(record);
+      if (entry === undefined) {
+        const onLifecycle = (reason: RecordLifecycle): void => {
+          if (reason !== "inspect") restore(record);
+        };
+        entry = createEntry(document, record, actions, onLifecycle);
+        entries.set(record, entry);
+        record.source.after(entry.host);
+      }
+      entry.translation.textContent = success.text;
+      entry.meta.textContent = `${success.sourceLanguage} → ${success.targetLanguage}`;
+      entry.status.textContent = STALE_NOTICE;
+    },
     setError(record, message) {
       if (record.phase === "stale") {
         restore(record);
@@ -96,6 +125,10 @@ export const createInlineView = (
       for (const record of [...entries.keys()]) restore(record);
     },
   };
+};
+
+const assertNever = (value: never): never => {
+  throw new TypeError(`Unhandled lifecycle: ${String(value)}`);
 };
 
 const createEntry = (

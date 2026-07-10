@@ -53,9 +53,8 @@ export const createHoverView = (
     const entry = entries.get(record);
     if (entry === undefined) return;
     restoreText(entry);
-    if (entry.ownsTabIndex) {
+    if (entry.ownsTabIndex)
       restoreOwnedAttribute(record.source, "tabindex", "0", entry.originalTabIndex);
-    }
     removeListeners(entry);
     entry.unregisterRestorer();
     entry.actionHost.remove();
@@ -73,6 +72,7 @@ export const createHoverView = (
 
   return {
     render,
+    markStale() {},
     setError(record, message) {
       if (!entries.has(record)) render(record);
       const entry = entries.get(record);

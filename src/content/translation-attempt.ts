@@ -12,6 +12,7 @@ export type TranslationAttempt = Readonly<{
   source: HTMLElement;
   preference: SourcePreference;
   target: string;
+  signal?: AbortSignal;
 }>;
 
 export type TranslationRuntime = Readonly<{
@@ -35,17 +36,28 @@ export const executeTranslation = async (
   runtime: TranslationRuntime,
 ): Promise<boolean> => {
   const record = runtime.store.getOrCreate(attempt.source);
+  record.restoreView("inspect");
+  if ((attempt.source.textContent ?? "") !== record.sourceFingerprint) record.refreshSource();
+  const priorSuccess = record.lastSuccess;
   const fingerprint = attempt.source.textContent ?? "";
   record.transition("queued");
   record.transition("translating");
   try {
     const result = await runtime.engine.translate(translationRequest(attempt, recordText(record)));
+    if (attempt.signal?.aborted === true) {
+      restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
+      return false;
+    }
     if (!attempt.source.isConnected || (attempt.source.textContent ?? "") !== fingerprint) {
       runtime.store.markStale(record);
       return false;
     }
     return commitResult({ record, result, fingerprint, runtime });
   } catch (error: unknown) {
+    if (attempt.signal?.aborted === true) {
+      restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
+      return false;
+    }
     if (!(error instanceof TranslationError)) throw error;
     const message = errorMessage(error);
     record.fail(message);
@@ -53,6 +65,24 @@ export const executeTranslation = async (
     runtime.announce(message);
     return false;
   }
+};
+
+const restoreCancelledAttempt = (
+  record: ElementRecord,
+  priorSuccess: ElementRecord["lastSuccess"],
+  fingerprint: string,
+  store: RecordStore,
+): void => {
+  if (priorSuccess === null) {
+    store.remove(record.source);
+    return;
+  }
+  record.complete(
+    priorSuccess.text,
+    priorSuccess.sourceLanguage,
+    priorSuccess.targetLanguage,
+    fingerprint,
+  );
 };
 
 const translationRequest = (attempt: TranslationAttempt, text: string): TranslationRequest => {

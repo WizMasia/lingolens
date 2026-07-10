@@ -1,3 +1,4 @@
+import type { TabState } from "../shared/protocol";
 import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
 import {
@@ -8,6 +9,8 @@ import {
 } from "./element-menu";
 import { createHoverView } from "./hover-view";
 import { createInlineView } from "./inline-view";
+import type { PageJobOutcome } from "./jobs";
+import { createPageController } from "./page-controller";
 import {
   createRecordStore,
   type ElementRecord,
@@ -33,6 +36,9 @@ export type TranslationController = Readonly<{
   store: RecordStore;
   setHovered(source: HTMLElement | null): void;
   translateTarget(source?: HTMLElement): Promise<void>;
+  translatePage(): Promise<void>;
+  restorePage(): void;
+  getState(): TabState;
   retranslate(source: HTMLElement, choice: ElementLanguageOverride): Promise<void>;
   openElementMenu(source: HTMLElement): Promise<void>;
   restoreElement(source: HTMLElement): void;
@@ -48,6 +54,7 @@ export type TranslationControllerDependencies = Readonly<{
   menu?: ElementMenu;
   languages?: readonly ElementLanguageChoice[];
   notice?: (message: string) => void;
+  onState?: (state: TabState) => void;
 }>;
 
 type PoliteAnnouncer = Readonly<{
@@ -104,6 +111,27 @@ export const createTranslationController = (
     return executeTranslation(attempt, runtime);
   };
 
+  const page = createPageController({
+    document: dependencies.document,
+    store,
+    async translate(source, signal): Promise<PageJobOutcome> {
+      const record = store.getOrCreate(source);
+      const succeeded = await perform({
+        source,
+        preference: settings.source,
+        target: targetLanguage(settings),
+        signal,
+      });
+      if (signal.aborted) return "skipped";
+      if (succeeded) return "translated";
+      return record.phase === "error" || record.phase === "stale" ? "failed" : "skipped";
+    },
+    onStale(record) {
+      view.markStale(record);
+    },
+    onState: dependencies.onState ?? (() => undefined),
+  });
+
   const retranslate = async (
     source: HTMLElement,
     choice: ElementLanguageOverride,
@@ -116,12 +144,14 @@ export const createTranslationController = (
       target: choice.target,
     });
     if (succeeded) record.setLanguageOverride(choice);
+    page.syncRecords();
   };
 
   const restoreElement = (source: HTMLElement): void => {
     const record = store.getOrCreate(source);
     record.setLanguageOverride(null);
     store.remove(source);
+    page.syncRecords();
   };
 
   return {
@@ -149,7 +179,11 @@ export const createTranslationController = (
         preference: settings.source,
         target: targetLanguage(settings),
       });
+      page.syncRecords();
     },
+    translatePage: page.translatePage,
+    restorePage: page.restorePage,
+    getState: page.getState,
     retranslate,
     openElementMenu(source) {
       return openMenu(store.getOrCreate(source));
@@ -164,6 +198,7 @@ export const createTranslationController = (
       for (const record of store.active) view.render(record);
     },
     destroy() {
+      page.destroy();
       menu.destroy();
       announcer.destroy();
       view.destroy();

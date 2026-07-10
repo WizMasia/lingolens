@@ -27,10 +27,11 @@ export type ElementLanguageOverride = Readonly<{
   target: string;
 }>;
 
-export type RecordLifecycle = "stale" | "remove" | "clear";
+export type RecordLifecycle = "inspect" | "stale" | "remove" | "clear";
 
 export type TranslationView = Readonly<{
   render(record: ElementRecord): void;
+  markStale(record: ElementRecord): void;
   setError(record: ElementRecord, message: string): void;
   restore(record: ElementRecord): void;
   destroy(): void;
@@ -143,6 +144,11 @@ export class ElementRecord {
 
   setLanguageOverride(override: ElementLanguageOverride | null): void {
     this.#languageOverride = override;
+  }
+
+  refreshSource(): void {
+    this.#currentSnapshot = snapshotText(this.source);
+    this.#sourceFingerprint = this.source.textContent ?? "";
   }
 
   registerRestorer(callback: RestoreCallback): () => void {

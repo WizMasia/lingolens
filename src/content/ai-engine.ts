@@ -94,8 +94,15 @@ export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine =
   const results = new Map<string, TranslationResult>();
   const resultsInFlight = new Map<string, Promise<TranslationResult>>();
   const requestsInFlight = new Map<string, Promise<TranslationResult>>();
-  const detectSource = createSourceDetector(adapter);
   let active = true;
+  const sourceDetector = createSourceDetector(adapter);
+
+  const detectSource = async (request: SourceDetectionRequest): Promise<SourceDetection> => {
+    assertActive(active);
+    const detection = await sourceDetector(request);
+    assertActive(active);
+    return detection;
+  };
 
   const availability = async (source: string, target: string): Promise<AiAvailability> => {
     assertActive(active);

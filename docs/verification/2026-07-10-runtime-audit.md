@@ -5,7 +5,7 @@
 - Google Chrome: 149.0.7827.201 detected locally.
 - Extension build: `dist/` produced from `codex/local-page-translator`.
 - Automated Chrome control: unavailable because the installed ChatGPT Chrome Extension did not establish a browser-control session, despite Chrome and the helper extension being installed and enabled.
-- Automated regression suite: 129 tests across 20 files, 228 assertions.
+- Automated regression suite: 129 tests across 20 files, 230 assertions.
 - Headless unpacked-extension smoke test: Chrome accepted `dist/` and started `chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js`.
 
 ## Hypothesis 1: Model initialization loses visible progress

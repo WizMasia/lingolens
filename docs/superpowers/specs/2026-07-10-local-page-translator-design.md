@@ -76,14 +76,14 @@ The extension never writes translated HTML. All results are inserted as text to 
 
 ### 3.5 Per-element retranslation
 
-Each translated element has an accessible `Change language` action:
+Each translated element can be retranslated with the configured trigger key:
 
 - inline mode places the action in the translation block;
-- hover mode shows a compact anchored action while the translation is visible;
-- focusing the translated element exposes the same action for keyboard users;
-- pressing the configured trigger on an already translated element opens the same control.
+- hover mode inserts no action surface or sibling element;
+- existing focusable sources can temporarily show the translation on focus;
+- pressing the configured trigger on an already translated source opens the language control.
 
-The control provides source language (`Auto detect` or explicit) and target language selectors. Confirming `Translate again` affects only that element and does not alter global options. The new result replaces the existing result atomically. If model download or translation fails, the previous successful translation remains visible and an inline error is announced.
+The control provides source language (`Auto detect` or explicit) and target language selectors. Confirming `Translate again` affects only that element and does not alter global options. The new result replaces the existing result atomically. If model download or translation fails, the existing result is retained for inline mode and a persistent extension announcement reports the error; hover mode restores the original source text without adding page UI.
 
 Restoring one element removes its translation and per-element language override. Restoring the page removes all extension-generated UI, translations, overrides, and temporary text swaps.
 
@@ -140,7 +140,7 @@ Records are keyed by actual DOM elements and contain:
 - latest successful translation;
 - state: queued, detecting, downloading, translating, translated, stale, or error;
 - optional per-element language override;
-- references to extension-owned inline or floating UI.
+- references to extension-owned inline UI when that display mode is selected.
 
 Page DOM identifiers are not written onto host elements. A `WeakMap` owns live records, while a separate iterable set contains only active translated records for restoration and progress.
 

@@ -91,7 +91,7 @@ export const createTranslationController = (
   const createView = (): TranslationView =>
     settings.displayMode === "inline"
       ? createInlineView(dependencies.document, actions)
-      : createHoverView(actions);
+      : createHoverView();
   view = createView();
   const menu =
     dependencies.menu ??
@@ -170,7 +170,7 @@ export const createTranslationController = (
         return;
       }
       const record = store.getOrCreate(target);
-      if (record.lastSuccess !== null) {
+      if (record.lastSuccess !== null || record.phase === "error") {
         await openMenu(record);
         return;
       }

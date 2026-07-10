@@ -11,13 +11,39 @@ describe("settings", () => {
     expect(resolveBrowserTarget("pt-BR")).toBe("pt");
   });
 
-  it("defaults to automatic source, browser target, inline, and Control", () => {
+  it("defaults to automatic source, browser target, hover, and Control", () => {
     expect(parseSettings(undefined, "ko-KR")).toEqual({
-      displayMode: "inline",
+      displayMode: "hover",
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: "ko" },
       trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
     });
+  });
+
+  it("preserves an explicitly saved inline display mode", () => {
+    expect(parseSettings({ displayMode: "inline" }, "ko-KR").displayMode).toBe("inline");
+  });
+
+  it("falls back to hover for an invalid saved display mode", () => {
+    expect(parseSettings({ displayMode: "invalid" }, "ko-KR").displayMode).toBe("hover");
+  });
+
+  it("rejects Escape as a saved translation trigger", () => {
+    expect(
+      parseSettings(
+        { trigger: { key: "Escape", ctrl: false, alt: false, meta: false, shift: false } },
+        "ko-KR",
+      ).trigger,
+    ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
+  });
+
+  it("rejects a differently cased saved Escape trigger", () => {
+    expect(
+      parseSettings(
+        { trigger: { key: "escape", ctrl: false, alt: false, meta: false, shift: false } },
+        "ko-KR",
+      ).trigger,
+    ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
   });
 
   it("matches modifier-only Control without firing on repeats", () => {

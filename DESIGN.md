@@ -87,11 +87,11 @@ All margins, padding, and gaps use the spacing tokens. The popup is a single com
 
 ### Hover Action
 
-- **Structure**: one compact action surface anchored to the focused or hovered target, containing language summary and translate or retranslate action.
-- **Variants**: translate, retranslate, restore, unavailable.
-- **States**: pointer hover and keyboard focus reveal the same actions; Escape dismisses; focus does not disappear while moving into the action surface; loading and errors are announced politely.
-- **Accessibility**: keyboard reachability does not depend on hover, target is at least 44px, and placement never changes DOM reading order.
-- **Motion**: appearance uses opacity only. Reduced-motion duration is zero.
+- **Structure**: no injected visual element. The source element's own text temporarily becomes the translated text while it is hovered or focused.
+- **Variants**: translated on hover/focus, restored on leave/blur, unavailable, stale.
+- **States**: pointer hover and keyboard focus activate the same temporary replacement; leave, blur, Escape, restore, stale content, and teardown synchronously restore the original source. Retranslation and restoration commands remain available through the configured trigger key rather than a hover-inserted button.
+- **Accessibility**: hover never inserts focusable controls, changes page DOM order, or adds tab stops. Existing focusable source elements support keyboard activation; the configured trigger key opens retranslation controls for any translated source. Status and errors use the persistent extension live announcer.
+- **Motion**: no injected hover surface or decorative movement. Reduced-motion behavior is unchanged.
 
 ### Field Group
 
@@ -131,7 +131,7 @@ Extension-owned surfaces use paper with `--lt-border`, defined as `1px solid var
 
 - Target WCAG 2.2 AA. Text inside extension-owned surfaces maintains at least 4.5:1 contrast, and non-text controls maintain at least 3:1 contrast.
 - Every interactive target is at least 44px in both dimensions and has a visible 2px moss focus ring.
-- Popup, options, injected inline blocks, and hover actions are fully keyboard reachable. Hover never exposes an action that focus cannot expose.
+- Popup, options, and injected inline blocks are fully keyboard reachable. Existing focusable source elements support hover-mode keyboard activation, while the configured trigger key opens retranslation controls for any translated source.
 - Progress and completion use polite live regions. Errors remain visible until resolved or dismissed.
 - Reduced motion removes transitions. User zoom, text scaling, high contrast settings, and logical RTL layout remain usable.
 - Shadow DOM isolates extension-owned styles from host pages. Owned controls use semantic HTML and do not alter the host document's reading order.
@@ -149,7 +149,7 @@ Extension-owned surfaces use paper with `--lt-border`, defined as `1px solid var
 
 | Item | Location | Why accepted | Owner / Exit |
 | --- | --- | --- | --- |
-| Host-page colors may reduce visual harmony around an inline block, but never contrast below 4.5:1 inside extension-owned surfaces. | Injected inline and hover surfaces | Arbitrary host styling cannot be harmonized safely without weakening isolation or predictability. | Keep paper and ink inside Shadow DOM; revisit only with real-page visual QA evidence. |
+| Host-page colors may reduce visual harmony around an inline block, but never contrast below 4.5:1 inside the extension-owned surface. | Injected inline block | Arbitrary host styling cannot be harmonized safely without weakening isolation or predictability. | Keep paper and ink inside Shadow DOM; revisit only with real-page visual QA evidence. |
 
 ### Verification handoff
 

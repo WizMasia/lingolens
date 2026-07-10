@@ -75,6 +75,23 @@ describe("Chromium AI adapter", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("returns no secondary evidence when Chrome i18n throws synchronously", async () => {
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: {
+        i18n: {
+          detectLanguage: vi.fn().mockImplementation(() => {
+            throw new Error("sync CLD failure");
+          }),
+        },
+      },
+    });
+
+    await expect(
+      createChromiumAiAdapter().detectWithChrome("Brief"),
+    ).resolves.toBeUndefined();
+  });
+
   it("reports API absence without reading missing globals", async () => {
     // Given
     Reflect.deleteProperty(globalThis, "LanguageDetector");

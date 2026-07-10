@@ -51,16 +51,18 @@ export const createChromiumAiAdapter = (
     async detectWithChrome(text) {
       const detectLanguage = globalThis.chrome?.i18n?.detectLanguage;
       if (detectLanguage === undefined) return undefined;
-      return detectLanguage(text).then(
-        (result) => ({
-          reliable: result.isReliable,
-          languages: result.languages.map(({ language, percentage }) => ({
-            language,
-            percentage,
-          })),
-        }),
-        () => undefined,
-      );
+      return Promise.resolve()
+        .then(() => detectLanguage(text))
+        .then(
+          (result) => ({
+            reliable: result.isReliable,
+            languages: result.languages.map(({ language, percentage }) => ({
+              language,
+              percentage,
+            })),
+          }),
+          () => undefined,
+        );
     },
     async availability(source, target) {
       assertActive(active);

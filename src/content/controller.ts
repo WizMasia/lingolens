@@ -240,15 +240,19 @@ const createPoliteAnnouncer = (document: Document): PoliteAnnouncer => {
 const targetLanguage = (settings: Settings): string =>
   settings.target.kind === "fixed" ? settings.target.language : settings.target.resolvedLanguage;
 
-const menuSelection = (record: ElementRecord, settings: Settings): ElementMenuSelection => ({
-  source:
-    record.languageOverride?.source ??
-    (settings.source.kind === "fixed" ? settings.source.language : "auto"),
-  target:
-    record.languageOverride?.target ??
-    record.lastSuccess?.targetLanguage ??
-    targetLanguage(settings),
-});
+const menuSelection = (record: ElementRecord, settings: Settings): ElementMenuSelection => {
+  const detectedSource = record.lastSuccess?.sourceLanguage;
+  return {
+    source:
+      record.languageOverride?.source ??
+      (settings.source.kind === "fixed" ? settings.source.language : "auto"),
+    target:
+      record.languageOverride?.target ??
+      record.lastSuccess?.targetLanguage ??
+      targetLanguage(settings),
+    ...(detectedSource === undefined ? {} : { detectedSource }),
+  };
+};
 
 const settingsLanguages = (settings: Settings): readonly ElementLanguageChoice[] => {
   const values = new Set<string>([targetLanguage(settings)]);

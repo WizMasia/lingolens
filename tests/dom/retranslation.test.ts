@@ -179,6 +179,69 @@ describe("per-element retranslation", () => {
     await expect(pending).resolves.toEqual({ kind: "cancel" });
   });
 
+  it("shows the detected source language after a successful translation", async () => {
+    // Given
+    const source = sourceFixture();
+    const engine: TranslationEngine = {
+      async translate() {
+        return result("안녕하세요", "ko");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      languages: LANGUAGES,
+      settings: SETTINGS,
+    });
+    await controller.translateTarget(source);
+
+    // When
+    const pending = controller.openElementMenu(source);
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    const menuText = host === null ? "" : (shadowRoots.get(host)?.textContent ?? "");
+
+    // Then
+    expect(menuText).toContain("Detected source: English");
+
+    controller.destroy();
+    await pending;
+  });
+
+  it("shows an unknown detected source before the element has a successful translation", async () => {
+    // Given
+    const source = sourceFixture();
+    const engine: TranslationEngine = {
+      async translate() {
+        return result("안녕하세요", "ko");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      languages: LANGUAGES,
+      settings: SETTINGS,
+    });
+
+    // When
+    const pending = controller.openElementMenu(source);
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    const menuText = host === null ? "" : (shadowRoots.get(host)?.textContent ?? "");
+
+    // Then
+    expect(menuText).toContain("Detected source: Unknown");
+
+    controller.destroy();
+    await pending;
+  });
+
   it("cancels when a pointer interaction occurs outside the menu overlay", async () => {
     // Given
     const source = sourceFixture();

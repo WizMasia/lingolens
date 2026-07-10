@@ -11,6 +11,7 @@ export type ElementMenuResult =
 export type ElementMenuSelection = Readonly<{
   source: "auto" | string;
   target: string;
+  detectedSource?: string;
 }>;
 
 export type ElementMenu = Readonly<{
@@ -47,6 +48,7 @@ const MENU_STYLES = `
   select { background: white; border: var(--lt-border, 1px solid rgb(23 32 27 / 12%));
     border-radius: var(--lt-radius, 10px); color: inherit; padding-inline: var(--lt-space-2, 8px); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--lt-space-2, 8px); }
+  .detected { color: var(--lt-color-muted, #5b625d); margin: 0; }
   button { background: transparent; border: 0; color: var(--lt-color-moss, #2f6d4f);
     cursor: pointer; min-inline-size: var(--lt-target-min, 44px); padding-inline: var(--lt-space-2, 8px); }
   button[data-action="restore"] { color: var(--lt-color-danger, #a33a32); }
@@ -134,6 +136,9 @@ const createControls = (
   target.value = selection.target;
   const sourceLabel = labeled(document, "Source language", source);
   const targetLabel = labeled(document, "Target language", target);
+  const detected = document.createElement("p");
+  detected.className = "detected";
+  detected.textContent = `Detected source: ${detectedSourceLabel(languages, selection.detectedSource)}`;
   const actions = document.createElement("div");
   actions.className = "actions";
   const translate = actionButton(document, "translate", "Translate again");
@@ -143,7 +148,7 @@ const createControls = (
   status.className = "status";
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
-  surface.append(sourceLabel, targetLabel, actions, status);
+  surface.append(detected, sourceLabel, targetLabel, actions, status);
   return { surface, source, target, translate, restore, status };
 };
 
@@ -177,6 +182,14 @@ const appendLanguages = (
     appendOption(select, language.value, language.label);
     values.add(language.value);
   }
+};
+
+const detectedSourceLabel = (
+  languages: readonly ElementLanguageChoice[],
+  detectedSource: string | undefined,
+): string => {
+  if (detectedSource === undefined) return "Unknown";
+  return languages.find(({ value }) => value === detectedSource)?.label ?? detectedSource;
 };
 
 const appendOption = (select: HTMLSelectElement, value: string, label: string): void => {

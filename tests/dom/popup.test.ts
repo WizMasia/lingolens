@@ -33,6 +33,7 @@ const fixture = (): PopupDependencies & { sent: RuntimeMessage[] } => {
         source: { kind: "auto" },
         target: { kind: "fixed", language: "ja" },
         trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
+        menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
       }) satisfies Settings,
     sendToActiveTab: async (message) => {
       sent.push(message);

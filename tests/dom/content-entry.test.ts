@@ -1,7 +1,12 @@
 import { Window } from "happy-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranslationController } from "../../src/content/controller";
-import { createContentApp, eventElement, productionLanguages } from "../../src/content/index";
+import {
+  type ContentApp,
+  createContentApp,
+  eventElement,
+  productionLanguages,
+} from "../../src/content/index";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -36,10 +41,11 @@ const SETTINGS: Settings = {
   source: { kind: "auto" },
   target: { kind: "browser", resolvedLanguage: "ko" },
   trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
+  menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };
 
-const controllerFixture = (): TranslationController => ({
-  settings: SETTINGS,
+const controllerFixture = (settings: Settings = SETTINGS): TranslationController => ({
+  settings,
   store: {
     active: new Set(),
     getOrCreate: vi.fn(),
@@ -62,37 +68,94 @@ const controllerFixture = (): TranslationController => ({
   destroy: vi.fn(),
 });
 
+const apps: ContentApp[] = [];
+
+const createTestContentApp = (
+  controller: TranslationController,
+  settings: Settings = SETTINGS,
+): ContentApp => {
+  const app = createContentApp(document, {
+    controller,
+    loadSettings: async () => settings,
+    isTrustedEvent: () => true,
+  });
+  apps.push(app);
+  return app;
+};
+
 describe("content entry", () => {
-  beforeEach(() => document.body.replaceChildren());
+  beforeEach(() => {
+    for (const app of apps.splice(0)) app.destroy();
+    document.body.replaceChildren();
+  });
 
   it("tracks a hovered target and translates it with Control", async () => {
     const paragraph = document.createElement("p");
     paragraph.textContent = "Meaningful text to translate";
     document.body.append(paragraph);
     const controller = controllerFixture();
-    createContentApp(document, { controller, loadSettings: async () => SETTINGS });
+    createTestContentApp(controller);
     paragraph.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Control", ctrlKey: true, bubbles: true }),
     );
+    expect(controller.translateTarget).not.toHaveBeenCalled();
+    paragraph.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", bubbles: true }));
     await Promise.resolve();
     expect(controller.translateTarget).toHaveBeenCalledOnce();
   });
 
-  it("opens an element menu for a hovered target with Alt plus Control without translating", async () => {
+  it("opens an element menu with Control then Shift without translating", async () => {
     const paragraph = document.createElement("p");
     paragraph.textContent = "Meaningful text to translate";
     document.body.append(paragraph);
     const controller = controllerFixture();
-    createContentApp(document, { controller, loadSettings: async () => SETTINGS });
+    createTestContentApp(controller);
     paragraph.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
     expect(controller.setHovered).toHaveBeenCalledWith(paragraph);
     paragraph.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "Control",
         ctrlKey: true,
-        altKey: true,
         bubbles: true,
       }),
+    );
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Shift",
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "Shift", ctrlKey: true, bubbles: true }),
+    );
+    await Promise.resolve();
+
+    expect(controller.openElementMenu).toHaveBeenCalledWith(paragraph);
+    expect(controller.translateTarget).not.toHaveBeenCalled();
+  });
+
+  it("opens an element menu with Shift then Control without translating", async () => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Meaningful text to translate";
+    document.body.append(paragraph);
+    const controller = controllerFixture();
+    createTestContentApp(controller);
+    paragraph.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Shift", shiftKey: true, bubbles: true }),
+    );
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Control",
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "Control", shiftKey: true, bubbles: true }),
     );
     await Promise.resolve();
 
@@ -119,7 +182,7 @@ describe("content entry", () => {
     const input = document.createElement("input");
     document.body.append(input);
     const controller = controllerFixture();
-    createContentApp(document, { controller, loadSettings: async () => SETTINGS });
+    createTestContentApp(controller);
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Control", ctrlKey: true, bubbles: true }),
     );
@@ -130,10 +193,7 @@ describe("content entry", () => {
   it("routes runtime commands and reapplies stored settings", async () => {
     const controller = controllerFixture();
     const hoverSettings: Settings = { ...SETTINGS, displayMode: "hover" };
-    const app = createContentApp(document, {
-      controller,
-      loadSettings: async () => hoverSettings,
-    });
+    const app = createTestContentApp(controller, hoverSettings);
     await app.handleMessage({ type: "translate-page" });
     app.handleMessage({ type: "restore-page" });
     await app.handleMessage({ type: "settings-changed" });
@@ -146,5 +206,78 @@ describe("content entry", () => {
     const languages = productionLanguages();
     expect(languages.length).toBeGreaterThan(10);
     expect(languages).toContainEqual({ value: "ja", label: "일본어" });
+  });
+
+  it("arbitrates swapped modifier prefixes without dispatching both actions", async () => {
+    const swapped: Settings = {
+      ...SETTINGS,
+      trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
+      menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
+    };
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Meaningful text to translate";
+    document.body.append(paragraph);
+    const controller = controllerFixture(swapped);
+    createTestContentApp(controller, swapped);
+    paragraph.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Control", ctrlKey: true, bubbles: true }),
+    );
+    expect(controller.openElementMenu).not.toHaveBeenCalled();
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Shift",
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "Shift", ctrlKey: true, bubbles: true }),
+    );
+    await Promise.resolve();
+
+    expect(controller.translateTarget).toHaveBeenCalledOnce();
+    expect(controller.openElementMenu).not.toHaveBeenCalled();
+  });
+
+  it("ignores untrusted page-generated shortcut events", async () => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Meaningful text to translate";
+    document.body.append(paragraph);
+    const controller = controllerFixture();
+    const app = createContentApp(document, { controller, loadSettings: async () => SETTINGS });
+    apps.push(app);
+    paragraph.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Control", ctrlKey: true, bubbles: true }),
+    );
+    paragraph.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", bubbles: true }));
+    await Promise.resolve();
+
+    expect(controller.translateTarget).not.toHaveBeenCalled();
+    expect(controller.openElementMenu).not.toHaveBeenCalled();
+  });
+
+  it("does not let an untrusted keyup cancel a pending trusted shortcut", async () => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Meaningful text to translate";
+    document.body.append(paragraph);
+    const controller = controllerFixture();
+    const untrustedKeyUp = new KeyboardEvent("keyup", { key: "Control", bubbles: true });
+    const app = createContentApp(document, {
+      controller,
+      loadSettings: async () => SETTINGS,
+      isTrustedEvent: (event) => event !== untrustedKeyUp,
+    });
+    apps.push(app);
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Control", ctrlKey: true, bubbles: true }),
+    );
+    paragraph.dispatchEvent(untrustedKeyUp);
+    paragraph.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", bubbles: true }));
+    await Promise.resolve();
+
+    expect(controller.translateTarget).toHaveBeenCalledOnce();
   });
 });

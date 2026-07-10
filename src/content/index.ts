@@ -1,10 +1,11 @@
 import { LANGUAGE_CHOICES } from "../shared/languages";
 import { parseMessage } from "../shared/protocol";
 import {
-  matchesMenuTrigger,
+  isModifierTrigger,
   matchesTrigger,
   parseSettings,
   type Settings,
+  type TriggerBinding,
 } from "../shared/settings";
 import { createTranslationEngine } from "./ai-engine";
 import { createChromiumAiAdapter } from "./chromium-ai-adapter";
@@ -14,6 +15,7 @@ import { nearestTarget } from "./targets";
 export type ContentDependencies = Readonly<{
   controller: TranslationController;
   loadSettings(): Promise<Settings>;
+  isTrustedEvent?(event: Event): boolean;
 }>;
 
 export type ContentApp = Readonly<{
@@ -35,22 +37,51 @@ export const createContentApp = (
 ): ContentApp => {
   let settings = dependencies.controller.settings;
   let currentTarget: HTMLElement | null = null;
+  let pendingAction: ShortcutAction | null = null;
+
+  const isTrustedEvent = (event: Event): boolean =>
+    dependencies.isTrustedEvent?.(event) ?? event.isTrusted;
+  const executeAction = (action: ShortcutAction, event: KeyboardEvent): void => {
+    if (action === "translation") {
+      void dependencies.controller.translateTarget();
+      return;
+    }
+    const target = currentTarget ?? nearestTarget(eventElement(event));
+    if (target !== undefined) void dependencies.controller.openElementMenu(target);
+  };
 
   const onPointer = (event: PointerEvent): void => {
+    if (!isTrustedEvent(event)) return;
     currentTarget = nearestTarget(eventElement(event)) ?? null;
     dependencies.controller.setHovered(currentTarget);
   };
   const onKey = (event: KeyboardEvent): void => {
-    if (isEditable(event.composedPath()[0])) return;
-    if (matchesMenuTrigger(event, settings.trigger)) {
-      event.preventDefault();
-      const target = currentTarget ?? nearestTarget(eventElement(event));
-      if (target !== undefined) void dependencies.controller.openElementMenu(target);
+    if (!isTrustedEvent(event) || event.repeat) return;
+    if (isEditable(event.composedPath()[0])) {
+      pendingAction = null;
       return;
     }
-    if (!matchesTrigger(event, settings.trigger)) return;
+    const action = matchedAction(event, settings);
+    if (action === null) {
+      pendingAction = null;
+      return;
+    }
     event.preventDefault();
-    void dependencies.controller.translateTarget();
+    if (isModifierTrigger(actionBinding(action, settings))) {
+      pendingAction = action;
+      return;
+    }
+    pendingAction = null;
+    executeAction(action, event);
+  };
+  const onKeyUp = (event: KeyboardEvent): void => {
+    if (!isTrustedEvent(event)) return;
+    const action = pendingAction;
+    pendingAction = null;
+    if (action === null || isEditable(event.composedPath()[0])) return;
+    if (!matchesTrigger(event, actionBinding(action, settings))) return;
+    event.preventDefault();
+    executeAction(action, event);
   };
   const handleMessage = (value: unknown): Promise<unknown> | unknown => {
     const message = parseMessage(value);
@@ -65,6 +96,7 @@ export const createContentApp = (
         return dependencies.controller.getState();
       case "settings-changed":
         return dependencies.loadSettings().then((next) => {
+          pendingAction = null;
           settings = next;
           dependencies.controller.applySettings(next);
         });
@@ -77,6 +109,7 @@ export const createContentApp = (
 
   document.addEventListener("pointerover", onPointer, true);
   document.addEventListener("keydown", onKey, true);
+  document.addEventListener("keyup", onKeyUp, true);
   void dependencies.loadSettings().then((loaded) => {
     settings = loaded;
     dependencies.controller.applySettings(loaded);
@@ -86,10 +119,22 @@ export const createContentApp = (
     destroy() {
       document.removeEventListener("pointerover", onPointer, true);
       document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keyup", onKeyUp, true);
       dependencies.controller.destroy();
     },
   };
 };
+
+type ShortcutAction = "translation" | "menu";
+
+const matchedAction = (event: KeyboardEvent, settings: Settings): ShortcutAction | null => {
+  if (matchesTrigger(event, settings.menuTrigger)) return "menu";
+  if (matchesTrigger(event, settings.trigger)) return "translation";
+  return null;
+};
+
+const actionBinding = (action: ShortcutAction, settings: Settings): TriggerBinding =>
+  action === "menu" ? settings.menuTrigger : settings.trigger;
 
 const isEditable = (value: EventTarget | undefined): boolean =>
   value instanceof Element &&

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Page Translator settings</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/shell.css" />
+    <link rel="stylesheet" href="styles/options.css" />
+  </head>
+  <body class="lt-options-shell">
+    <main class="surface options" aria-labelledby="lt-options-title">
+      <header class="options-header">
+        <p class="eyebrow">LOCAL PAGE TRANSLATOR</p>
+        <h1 id="lt-options-title">번역 설정</h1>
+        <p class="lede">언어, 표시 방식과 요소 번역 키를 선택하세요. 페이지 내용은 Chrome의 로컬 모델로 처리됩니다.</p>
+      </header>
+      <form id="settings-form">
+        <fieldset>
+          <legend>번역문 표시 방식</legend>
+          <label class="choice"><input type="radio" name="display-mode" value="inline" /> <span><strong>원문 아래 표시</strong><small>원문 다음에 번역문을 추가합니다.</small></span></label>
+          <label class="choice"><input type="radio" name="display-mode" value="hover" /> <span><strong>호버 시 교체</strong><small>가리키거나 포커스한 동안 번역문을 표시합니다.</small></span></label>
+        </fieldset>
+        <div class="field-grid">
+          <label class="field" for="source-language"><span>입력 언어</span><select id="source-language"></select><small>자동 감지는 요소마다 언어를 판별합니다.</small></label>
+          <label class="field" for="target-language"><span>도착 언어</span><select id="target-language"></select><small>브라우저 언어를 알 수 없으면 한국어를 사용합니다.</small></label>
+        </div>
+        <section class="trigger-section" aria-labelledby="trigger-title">
+          <div><h2 id="trigger-title">요소 번역 키</h2><p>버튼을 누른 뒤 원하는 키 조합을 입력하세요.</p></div>
+          <div class="trigger-control"><button type="button" id="trigger-capture" class="button secondary-button">키 변경</button><output id="trigger-value" class="keycap">Ctrl</output></div>
+          <p id="trigger-warning" class="secondary" aria-live="polite"></p>
+        </section>
+        <div class="save-row"><p id="save-status" role="status" aria-live="polite"></p><button type="submit" class="button primary">설정 저장</button></div>
+      </form>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "local-page-translator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "check": "bunx tsc --noEmit && bunx biome check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@types/chrome": "^0.2.2",
+    "@types/dom-chromium-ai": "^0.0.17",
+    "happy-dom": "^20.10.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

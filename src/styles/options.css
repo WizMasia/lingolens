@@ -1,0 +1,94 @@
+.options {
+  max-inline-size: var(--lt-options-max-width);
+  padding: 48px var(--lt-space-6) 64px;
+}
+.options-header {
+  margin-block-end: 32px;
+}
+.options-header .lede {
+  max-inline-size: 58ch;
+  margin-block-start: var(--lt-space-2);
+  font-size: var(--lt-font-size-body);
+}
+form {
+  display: grid;
+  gap: var(--lt-space-6);
+}
+fieldset,
+.trigger-section {
+  margin: 0;
+  padding: var(--lt-space-4);
+  border: var(--lt-border);
+  border-radius: var(--lt-radius);
+  background: rgb(255 255 255 / 48%);
+}
+legend {
+  padding-inline: var(--lt-space-2);
+  font-weight: 700;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lt-space-3);
+  padding: var(--lt-space-3);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.choice:hover {
+  background: rgb(47 109 79 / 6%);
+}
+.choice input {
+  margin-block-start: 3px;
+  accent-color: var(--lt-color-moss);
+}
+.choice span,
+.field {
+  display: grid;
+  gap: var(--lt-space-1);
+}
+.choice small {
+  display: block;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--lt-space-4);
+}
+.field > span {
+  font-weight: 700;
+}
+.trigger-section {
+  display: grid;
+  gap: var(--lt-space-3);
+}
+.trigger-section h2 + p {
+  margin-block-start: var(--lt-space-1);
+  color: rgb(23 32 27 / 66%);
+}
+.trigger-control {
+  justify-content: flex-start;
+}
+.keycap {
+  min-inline-size: 72px;
+  padding: 9px 12px;
+  border: var(--lt-border);
+  border-block-end-width: 3px;
+  border-radius: 7px;
+  background: white;
+  text-align: center;
+  font-weight: 700;
+}
+.save-row {
+  min-block-size: var(--lt-target-min);
+}
+#save-status {
+  color: var(--lt-color-moss);
+}
+@media (max-width: 560px) {
+  .options {
+    padding: var(--lt-space-6) var(--lt-space-4);
+  }
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Page Translator acceptance fixture</title>
+    <style>
+      body { max-width: 760px; margin: 40px auto; padding: 0 20px 80px; color: #17201b; font: 18px/1.65 system-ui, sans-serif; }
+      section { margin-block: 32px; padding: 20px; border: 1px solid #d8d3c7; border-radius: 12px; }
+      code, input, [contenteditable] { display: block; margin-block: 12px; padding: 10px; background: #f1eee6; }
+      button { min-height: 44px; padding: 8px 14px; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>Local Page Translator acceptance fixture</h1>
+    <section aria-labelledby="content-title">
+      <h2 id="content-title">Translatable content</h2>
+      <p id="english">A quiet reading experience should preserve meaning and protect the reader's privacy.</p>
+      <p id="japanese" lang="ja">このページは端末上の翻訳機能を確認するためのテストです。</p>
+      <p id="korean" lang="ko">이 문장은 도착 언어와 같을 때 건너뛰어야 합니다.</p>
+      <p id="short-french" lang="fr">Bonjour</p>
+      <p id="nested">The original <em>nested emphasis</em> and <a href="#checklist">link text</a> must survive restoration.</p>
+      <p id="arabic" lang="ar" dir="rtl">يجب أن يظهر النص المترجم في الاتجاه الصحيح.</p>
+    </section>
+    <section aria-labelledby="excluded-title">
+      <h2 id="excluded-title">Excluded content</h2>
+      <p class="hidden">Hidden text must not be translated.</p>
+      <code>const preservedSourceCode = true;</code>
+      <input value="Editable input must remain unchanged" />
+      <div contenteditable="true">Editable draft must remain unchanged.</div>
+    </section>
+    <section aria-labelledby="dynamic-title">
+      <h2 id="dynamic-title">Dynamic content</h2>
+      <p id="changing">This sentence changes when the timer or button runs.</p>
+      <button id="change" type="button">Change source</button>
+      <button id="append" type="button">Append content</button>
+      <div id="feed"></div>
+    </section>
+    <section id="checklist" aria-labelledby="checklist-title">
+      <h2 id="checklist-title">Expected behavior</h2>
+      <ol>
+        <li>English, Japanese, French, nested, and Arabic text can be translated.</li>
+        <li>Korean is skipped when Korean is the target.</li>
+        <li>Hidden, code, input, and editable text remain untouched.</li>
+        <li>Changing translated source marks its translation stale.</li>
+        <li>Appended content waits for the next explicit full-page run.</li>
+        <li>Restore returns nested markup and all source text exactly.</li>
+      </ol>
+    </section>
+    <script>
+      const changing = document.querySelector("#changing");
+      const change = () => { changing.textContent = "The page owner replaced this sentence after translation."; };
+      document.querySelector("#change").addEventListener("click", change);
+      document.querySelector("#append").addEventListener("click", () => {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = "This content was appended after the previous translation run.";
+        document.querySelector("#feed").append(paragraph);
+      });
+      setTimeout(change, 10000);
+    </script>
+  </body>
+</html>

@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript 5.x, Bun, esbuild, Vitest with happy-dom, Biome, Chrome Manifest V3, `@types/chrome`, `@types/dom-chromium-ai`, native Web Components/Shadow DOM.
 
+**Execution status (2026-07-10):** Tasks 1–9 and all automated gates are implemented on `codex/local-page-translator`. The checklist below is the original execution script and is retained as historical guidance rather than a live progress tracker. The only outstanding acceptance item is Task 9 Step 5's interactive Chrome/native-model/offline exercise, which is explicitly recorded in `docs/verification/2026-07-10-runtime-audit.md` because the available browser-control environment cannot attach to the user's Chrome session.
+
 ## Global Constraints
 
 - Minimum supported browser is Chrome 138 desktop; mobile and non-Chromium browsers are out of scope.

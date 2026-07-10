@@ -77,6 +77,7 @@ export class ElementRecord {
   #viewValues = new Map<Text, string>();
   #viewMutationCounts = new Map<Text, number>();
   #activeViewCount = 0;
+  #attemptVersion = 0;
   #restorers = new Set<RestoreCallback>();
   readonly #onPhaseChange: PhaseCallback;
 
@@ -110,6 +111,18 @@ export class ElementRecord {
 
   get languageOverride(): ElementLanguageOverride | null {
     return this.#languageOverride;
+  }
+
+  beginAttempt(): number {
+    this.#attemptVersion += 1;
+    this.#phase = "queued";
+    this.#error = null;
+    this.#onPhaseChange(this);
+    return this.#attemptVersion;
+  }
+
+  isCurrentAttempt(version: number): boolean {
+    return version === this.#attemptVersion;
   }
 
   transition(next: RecordPhase): void {

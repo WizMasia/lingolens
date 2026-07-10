@@ -41,11 +41,11 @@ export const executeTranslation = async (
   if ((attempt.source.textContent ?? "") !== record.sourceFingerprint) record.refreshSource();
   const priorSuccess = record.lastSuccess;
   const fingerprint = attempt.source.textContent ?? "";
-  record.transition("queued");
+  const attemptVersion = record.beginAttempt();
   record.transition("translating");
   try {
     const result = await runtime.engine.translate(translationRequest(attempt, recordText(record)));
-    if (!runtime.store.has(record)) return false;
+    if (!runtime.store.has(record) || !record.isCurrentAttempt(attemptVersion)) return false;
     if (attempt.signal?.aborted === true) {
       restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
       return false;
@@ -56,7 +56,7 @@ export const executeTranslation = async (
     }
     return commitResult({ record, result, fingerprint, runtime });
   } catch (error: unknown) {
-    if (!runtime.store.has(record)) return false;
+    if (!runtime.store.has(record) || !record.isCurrentAttempt(attemptVersion)) return false;
     if (attempt.signal?.aborted === true) {
       restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
       return false;

@@ -259,4 +259,37 @@ describe("targeted translation", () => {
     expect(document.querySelectorAll('[data-local-translator-ui="inline"]')).toHaveLength(0);
     expect(store.getOrCreate(source).phase).toBe("stale");
   });
+
+  it("keeps the latest result when translations overlap for one element", async () => {
+    // Given
+    const source = sourceFixture("Hello");
+    const resolvers: Array<(result: TranslationResult) => void> = [];
+    const engine: TranslationEngine = {
+      translate: () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    const first = controller.translateTarget(source);
+    const second = controller.retranslate(source, { source: "en", target: "ja" });
+    resolvers[1]?.({
+      kind: "translated",
+      text: "こんにちは",
+      sourceLanguage: "en",
+      targetLanguage: "ja",
+    });
+    await second;
+    resolvers[0]?.(translated("오래된 결과"));
+
+    // Then
+    await expect(first).resolves.toBeUndefined();
+    expect(controller.store.getOrCreate(source).lastSuccess?.text).toBe("こんにちは");
+  });
 });

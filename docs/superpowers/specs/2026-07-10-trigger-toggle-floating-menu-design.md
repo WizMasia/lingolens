@@ -9,13 +9,14 @@ Make the configured trigger key toggle translation on the current element withou
 - The configured trigger (default `Ctrl`) translates an untranslated target.
 - The same trigger on a target with a successful translation restores that target immediately. It must not open a language menu.
 - `Alt` plus the configured trigger opens per-element language selection for an existing translation or an error record. This supports explicit source/target selection after an automatic-detection failure.
+- `Alt` is reserved for this menu action, so a saved primary trigger containing Alt falls back to the default Control trigger.
 - The existing inline-card language action opens the same language selection UI.
 
 ## Floating Menu
 
 `ElementMenu` renders as one extension-owned Shadow DOM host appended to the document body and positioned with `position: fixed` beside the source's viewport rectangle. The host does not appear next to the source in DOM order, does not consume document layout space, and is removed when the action completes, Escape is pressed, or the extension is destroyed.
 
-The menu focuses its source-language selector when opened. Escape and clicking outside dismiss it without changing the translation. `Translate again` replaces only that element's result; `Restore original` removes only that element's translation.
+The menu focuses its source-language selector when opened and shows the detected/used source language from the element's latest successful translation. If no successful detection exists, it shows `Unknown`. Escape and clicking outside dismiss it without changing the translation. `Translate again` replaces only that element's result; `Restore original` removes only that element's translation.
 
 ## Implementation Boundaries
 

@@ -18,6 +18,12 @@ export type ContentApp = Readonly<{
 
 export const productionLanguages = () => LANGUAGE_CHOICES;
 
+export const eventElement = (event: Pick<Event, "composedPath" | "target">): Element | null => {
+  const composedTarget = event.composedPath().find((target) => target instanceof Element);
+  if (composedTarget instanceof Element) return composedTarget;
+  return event.target instanceof Element ? event.target : null;
+};
+
 export const createContentApp = (
   document: Document,
   dependencies: ContentDependencies,
@@ -25,10 +31,7 @@ export const createContentApp = (
   let settings = dependencies.controller.settings;
 
   const onPointer = (event: PointerEvent): void => {
-    const target = event.target;
-    dependencies.controller.setHovered(
-      target instanceof Element ? (nearestTarget(target) ?? null) : null,
-    );
+    dependencies.controller.setHovered(nearestTarget(eventElement(event)) ?? null);
   };
   const onKey = (event: KeyboardEvent): void => {
     if (isEditable(event.composedPath()[0])) return;

@@ -1,7 +1,7 @@
 import { Window } from "happy-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranslationController } from "../../src/content/controller";
-import { createContentApp, productionLanguages } from "../../src/content/index";
+import { createContentApp, eventElement, productionLanguages } from "../../src/content/index";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -76,6 +76,21 @@ describe("content entry", () => {
     );
     await Promise.resolve();
     expect(controller.translateTarget).toHaveBeenCalledOnce();
+  });
+
+  it("tracks the composed shadow target instead of the retargeted host", () => {
+    const host = document.createElement("div");
+    const shadow = host.attachShadow({ mode: "open" });
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Shadow text to translate";
+    shadow.append(paragraph);
+    document.body.append(host);
+    expect(
+      eventElement({
+        target: host,
+        composedPath: () => [paragraph, shadow, host, document],
+      }),
+    ).toBe(paragraph);
   });
 
   it("ignores configured keys originating from editable fields", async () => {

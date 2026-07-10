@@ -79,13 +79,14 @@ function parseTrigger(value: unknown): TriggerBinding {
     "key" in value && typeof value.key === "string" && value.key.length > 0
       ? value.key
       : DEFAULT_TRIGGER.key;
+  const alt = "alt" in value && typeof value.alt === "boolean" ? value.alt : DEFAULT_TRIGGER.alt;
 
-  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key))) return DEFAULT_TRIGGER;
+  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key)) || alt) return DEFAULT_TRIGGER;
 
   return {
     key,
     ctrl: "ctrl" in value && typeof value.ctrl === "boolean" ? value.ctrl : DEFAULT_TRIGGER.ctrl,
-    alt: "alt" in value && typeof value.alt === "boolean" ? value.alt : DEFAULT_TRIGGER.alt,
+    alt,
     meta: "meta" in value && typeof value.meta === "boolean" ? value.meta : DEFAULT_TRIGGER.meta,
     shift:
       "shift" in value && typeof value.shift === "boolean" ? value.shift : DEFAULT_TRIGGER.shift,

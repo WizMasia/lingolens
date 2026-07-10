@@ -51,6 +51,22 @@ describe("settings", () => {
     ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
   });
 
+  it("rejects saved primary triggers that reserve Alt for the element menu", () => {
+    expect(
+      parseSettings(
+        { trigger: { key: "Control", ctrl: false, alt: true, meta: false, shift: false } },
+        "ko-KR",
+      ).trigger,
+    ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
+
+    expect(
+      parseSettings(
+        { trigger: { key: "T", ctrl: true, alt: true, meta: false, shift: false } },
+        "ko-KR",
+      ).trigger,
+    ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
+  });
+
   it("matches modifier-only Control without firing on repeats", () => {
     const window = new Window();
     const originalKeyboardEvent = Object.getOwnPropertyDescriptor(globalThis, "KeyboardEvent");

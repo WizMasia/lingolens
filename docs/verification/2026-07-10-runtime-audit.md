@@ -5,7 +5,7 @@
 - Google Chrome: 149.0.7827.201 detected locally.
 - Extension build: `dist/` produced from `codex/local-page-translator`.
 - Automated Chrome control: unavailable because the installed ChatGPT Chrome Extension did not establish a browser-control session, despite Chrome and the helper extension being installed and enabled.
-- Automated regression suite: 128 tests across 18 files, 226 assertions.
+- Automated regression suite: 129 tests across 20 files, 228 assertions.
 - Headless unpacked-extension smoke test: Chrome accepted `dist/` and started `chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js`.
 
 ## Hypothesis 1: Model initialization loses visible progress
@@ -63,6 +63,14 @@
 **Evidence:** `src/content/index.ts` selects the first `Element` in `event.composedPath()` before falling back to `event.target`. `tests/dom/content-entry.test.ts` proves the helper returns the shadow paragraph rather than its host.
 
 **Result:** Open-shadow hover targeting follows the composed event path.
+
+## Hypothesis 8: Unknown automatic source leaves no recovery action
+
+**Risk:** A first translation attempt has insufficient detection confidence, but no result UI exists yet, leaving the user unable to select an explicit source language.
+
+**Evidence:** Inline and hover error rendering now mount a language-action surface even without a prior successful translation. `tests/dom/unknown-source-action.test.ts` verifies the first unknown-source response displays the local error and opens the per-element language menu.
+
+**Result:** Low-confidence automatic detection has an immediate explicit-language recovery path.
 
 ## Build and visual evidence
 

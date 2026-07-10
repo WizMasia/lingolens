@@ -112,11 +112,11 @@ All margins, padding, and gaps use the spacing tokens. The popup is a single com
 | `--lt-motion-duration` | `140ms` | Hover, press, and appearance feedback |
 | `--lt-motion-easing` | `ease-out` | Fast, calm state confirmation |
 
-Only opacity and transform transition. No control moves merely for decoration. Hover clarifies interactivity, active transform confirms a press, and opacity communicates appearance or removal. Under `prefers-reduced-motion: reduce`, `--lt-motion-duration` becomes `0ms`. Keyboard and pointer users receive equivalent state feedback.
+Opacity, transform, control-color, and progress-size transitions provide state feedback. No control moves merely for decoration. Hover clarifies interactivity, active transform confirms a press, and progress width communicates work. Under `prefers-reduced-motion: reduce`, `--lt-motion-duration` becomes `0ms`. Keyboard and pointer users receive equivalent state feedback.
 
 ## 7. Depth & Surface
 
-The strategy is borders-only. Extension-owned surfaces use paper with `--lt-border`, defined as `1px solid var(--lt-color-border)`, and `--lt-radius` at `10px`. There are no decorative shadows or nested cards. Spacing groups related content; borders separate the extension from the host page and separate only functionally distinct regions.
+Extension-owned surfaces use paper with `--lt-border`, defined as `1px solid var(--lt-color-border)`, and `--lt-radius` at `10px`. The popup/options shell uses a subtle paper gradient and low-contrast shadows to separate primary actions and live status from Chrome's surrounding UI; injected page surfaces remain border-led and avoid decorative nesting. Spacing groups related content, and borders separate functionally distinct regions.
 
 | Token | Value | Usage |
 | --- | --- | --- |

@@ -147,6 +147,6 @@ Run: `bun test && bunx tsc --noEmit && bunx biome check src/shared/settings.ts s
 
 Expected: all checks pass.
 
-- [ ] **Step 2: Drive Chrome acceptance**
+- [x] **Step 2: Drive Chrome acceptance**
 
 Reload the unpacked `dist` extension, use Ctrl to translate and restore the English fixture paragraph, use Alt+Ctrl to open language selection, and confirm the source has no sibling menu while the menu appears as a viewport overlay.

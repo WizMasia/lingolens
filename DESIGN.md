@@ -78,11 +78,12 @@ All margins, padding, and gaps use the spacing tokens. The popup is a single com
 ### Inline Translation Block
 
 - **Structure**: translated text, source and target language summary, status slot, contextual action row.
+- **Host-style echo**: the translated text copies the source element's computed font family, size, weight, style, line height, letter spacing, word spacing, text alignment, text transform, text indent, and writing mode. It also adopts the source element's display width and outer block margins so it occupies the same reading rhythm. The extension retains its own ink color so host dark-mode text cannot reduce contrast on the extension paper surface. It does not copy backgrounds, borders, positioning, transforms, animations, or arbitrary CSS custom properties.
 - **Variants**: ready, preparing, translating, recoverable error, unavailable.
 - **Spacing**: text uses `--lt-space-3`; actions use `--lt-space-2`; outer separation uses `--lt-space-2`.
 - **States**: loading retains original content; error retains the last successful translation; disabled actions explain the unavailable capability.
-- **Accessibility**: translation copy uses serif with 1.6 line height; status updates use `aria-live="polite"`; errors are textual; the original page text remains available.
-- **Isolation**: styles live inside an extension-owned Shadow Root and consume the same `--lt-*` contract.
+- **Accessibility**: translation copy defaults to serif with 1.6 line height when source styles are unavailable; status updates use `aria-live="polite"`; errors are textual; the original page text remains available.
+- **Isolation**: styles live inside an extension-owned Shadow Root. Host-derived typography is copied as explicit values at render time; each inline host sets every extension token it consumes as an important inline value so page-defined `--lt-*` variables cannot alter card contrast, controls, or touch-target sizing.
 
 ### Hover Action
 

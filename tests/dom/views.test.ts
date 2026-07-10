@@ -21,10 +21,6 @@ Object.defineProperty(testWindow.HTMLElement.prototype, "getClientRects", {
   configurable: true,
   value: () => [new testWindow.DOMRect(0, 0, 100, 20)],
 });
-Object.defineProperty(testWindow, "getComputedStyle", {
-  configurable: true,
-  value: () => ({ display: "block", opacity: "1", visibility: "visible" }),
-});
 const event = (type: string): Event => new Event(type);
 const shadowRoots = new WeakMap<Element, ShadowRoot>();
 const attachShadow = Element.prototype.attachShadow;

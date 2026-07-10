@@ -71,6 +71,7 @@ const result = (text: string, targetLanguage: string): TranslationResult => ({
   text,
   sourceLanguage: "en",
   targetLanguage,
+  provenance: "language-detector",
 });
 
 describe("per-element retranslation", () => {
@@ -83,6 +84,9 @@ describe("per-element retranslation", () => {
     const source = sourceFixture();
     const requests: TranslationRequest[] = [];
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate(request) {
         requests.push(request);
         return requests.length === 1 ? result("안녕하세요", "ko") : result("こんにちは", "ja");
@@ -184,6 +188,9 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return result("안녕하세요", "ko");
       },
@@ -216,6 +223,9 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return result("안녕하세요", "ko");
       },
@@ -322,6 +332,9 @@ describe("per-element retranslation", () => {
     const source = sourceFixture();
     let attempt = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         attempt += 1;
         if (attempt === 1) return result("안녕하세요", "ko");
@@ -353,6 +366,9 @@ describe("per-element retranslation", () => {
     const source = sourceFixture();
     let attempt = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         attempt += 1;
         return attempt === 1 ? result("안녕하세요", "ko") : { kind: "unknown-source" };
@@ -395,6 +411,9 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return result("안녕하세요", "ko");
       },

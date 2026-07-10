@@ -46,6 +46,9 @@ describe("unknown source action", () => {
       destroy() {},
     };
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return { kind: "unknown-source" };
       },
@@ -91,6 +94,9 @@ describe("unknown source action", () => {
     };
     let attempts = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         attempts += 1;
         return { kind: "unknown-source" };

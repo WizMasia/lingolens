@@ -1,6 +1,18 @@
 import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
+import type {
+  DetectionProvenance,
+  SourceDetection,
+  SourceDetectionRequest,
+} from "./source-detection";
+import { createSourceDetector } from "./source-detection";
 import { createTranslatorCache } from "./translator-cache";
+
+export type {
+  DetectionProvenance,
+  SourceDetection,
+  SourceDetectionRequest,
+} from "./source-detection";
 
 export type AiAvailability = "unavailable" | "downloadable" | "downloading" | "available";
 
@@ -42,8 +54,13 @@ export type TranslationResult =
       text: string;
       sourceLanguage: string;
       targetLanguage: string;
+      provenance: DetectionProvenance;
     }>
-  | Readonly<{ kind: "skipped"; sourceLanguage: string }>
+  | Readonly<{
+      kind: "skipped";
+      sourceLanguage: string;
+      provenance: DetectionProvenance;
+    }>
   | Readonly<{ kind: "unknown-source" }>;
 
 export type TranslationErrorCode = "api-unavailable" | "pair-unavailable" | "translation-failed";
@@ -61,13 +78,12 @@ export class TranslationError extends Error {
 }
 
 export type TranslationEngine = Readonly<{
+  detectSource(request: SourceDetectionRequest): Promise<SourceDetection>;
   translate(request: TranslationRequest): Promise<TranslationResult>;
   availability(source: string, target: string): Promise<AiAvailability>;
   destroy(): void;
 }>;
 
-const CONFIDENCE_THRESHOLD = 0.6;
-const SHORT_TEXT_LETTERS = 20;
 const RESULT_CACHE_LIMIT = 500;
 
 export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine => {
@@ -78,6 +94,7 @@ export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine =
   const results = new Map<string, TranslationResult>();
   const resultsInFlight = new Map<string, Promise<TranslationResult>>();
   const requestsInFlight = new Map<string, Promise<TranslationResult>>();
+  const detectSource = createSourceDetector(adapter);
   let active = true;
 
   const availability = async (source: string, target: string): Promise<AiAvailability> => {
@@ -101,12 +118,13 @@ export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine =
     assertActive(active);
     const target = normalizeLanguage(request.target);
     if (target === undefined) throw pairUnavailable(request.target);
-    const source = await resolveSource(adapter, request);
+    const sourceDetection = await detectSource(request);
     assertActive(active);
-    if (source === undefined) return { kind: "unknown-source" };
-    if (source === target) return { kind: "skipped", sourceLanguage: source };
+    if (sourceDetection.kind === "needs-confirmation") return { kind: "unknown-source" };
+    const { language: source, provenance } = sourceDetection;
+    if (source === target) return { kind: "skipped", sourceLanguage: source, provenance };
 
-    const cacheKey = `${source}\0${target}\0${request.text}`;
+    const cacheKey = `${source}\0${target}\0${provenance}\0${request.text}`;
     const cached = results.get(cacheKey);
     if (cached !== undefined) return cached;
     const pending = resultsInFlight.get(cacheKey);
@@ -118,6 +136,7 @@ export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine =
         text,
         sourceLanguage: source,
         targetLanguage: target,
+        provenance,
       }),
     );
     resultsInFlight.set(cacheKey, work);
@@ -146,6 +165,7 @@ export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine =
   };
 
   return {
+    detectSource,
     translate,
     availability,
     destroy() {
@@ -166,37 +186,6 @@ const requestKey = (request: TranslationRequest): string => {
       ? ["fixed", request.source.language]
       : ["auto", request.source.languageHint ?? "", request.source.context ?? ""];
   return JSON.stringify([source, request.target, request.text]);
-};
-
-const resolveSource = async (
-  adapter: AiAdapter,
-  request: TranslationRequest,
-): Promise<string | undefined> => {
-  if (request.source.kind === "fixed") return normalizeLanguage(request.source.language);
-  if (request.source.languageHint !== undefined) {
-    const hint = normalizeLanguage(request.source.languageHint);
-    if (hint !== undefined) return hint;
-  }
-  const input = detectionInput(request);
-  const [best] = await adapter.detect(input);
-  if (
-    best === undefined ||
-    best.confidence === undefined ||
-    best.confidence < CONFIDENCE_THRESHOLD ||
-    best.detectedLanguage === undefined
-  ) {
-    return undefined;
-  }
-  return normalizeLanguage(best.detectedLanguage);
-};
-
-const detectionInput = (request: TranslationRequest): string => {
-  if (request.source.kind === "fixed") return request.text;
-  const letterCount = request.text.trim().match(/\p{L}/gu)?.length ?? 0;
-  const context = request.source.context?.trim();
-  return letterCount < SHORT_TEXT_LETTERS && context !== undefined && context.length > 0
-    ? context
-    : request.text;
 };
 
 const createPairTranslator = async (

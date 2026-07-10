@@ -44,7 +44,11 @@ describe("translation engine", () => {
     const result = engine.translate({ text: "안녕하세요", source: { kind: "auto" }, target: "ko" });
 
     // Then
-    await expect(result).resolves.toEqual({ kind: "skipped", sourceLanguage: "ko" });
+    await expect(result).resolves.toEqual({
+      kind: "skipped",
+      sourceLanguage: "ko",
+      provenance: "language-detector",
+    });
   });
 
   it("deduplicates translator creation and identical in-flight text", async () => {
@@ -85,6 +89,7 @@ describe("translation engine", () => {
       text: "translated",
       sourceLanguage: "fr",
       targetLanguage: "ko",
+      provenance: "lang",
     });
     expect(adapter.detect).not.toHaveBeenCalled();
   });
@@ -100,22 +105,6 @@ describe("translation engine", () => {
     // Then
     await expect(result).resolves.toEqual({ kind: "unknown-source" });
     expect(adapter.createTranslator).not.toHaveBeenCalled();
-  });
-
-  it("uses context to detect source for text under twenty Unicode letters", async () => {
-    // Given
-    const adapter = makeAdapter();
-    const engine = createTranslationEngine(adapter);
-
-    // When
-    await engine.translate({
-      text: "Save",
-      source: { kind: "auto", context: "This setting saves your profile" },
-      target: "ko",
-    });
-
-    // Then
-    expect(adapter.detect).toHaveBeenCalledWith("This setting saves your profile");
   });
 
   it("rejects an unsupported language pair with a typed error", async () => {

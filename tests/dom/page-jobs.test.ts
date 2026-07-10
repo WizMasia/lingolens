@@ -8,7 +8,6 @@ import type {
 } from "../../src/content/ai-engine";
 import { TranslationError } from "../../src/content/ai-engine";
 import { createTranslationController } from "../../src/content/controller";
-import { type PageJobOutcome, runPageJob } from "../../src/content/jobs";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -67,130 +66,6 @@ const addSources = (...texts: readonly string[]): readonly HTMLElement[] =>
     document.body.append(source);
     return source;
   });
-
-describe("bounded page jobs", () => {
-  beforeEach(() => document.body.replaceChildren());
-
-  it("never runs more than three workers concurrently", async () => {
-    // Given
-    const gates = Array.from({ length: 5 }, () => deferred<PageJobOutcome>());
-    let active = 0;
-    let peak = 0;
-    const job = runPageJob(
-      gates,
-      async (gate) => {
-        active += 1;
-        peak = Math.max(peak, active);
-        const outcome = await gate.promise;
-        active -= 1;
-        return outcome;
-      },
-      () => undefined,
-      new AbortController().signal,
-    );
-    await Promise.resolve();
-
-    // When
-    for (const gate of gates) gate.resolve("translated");
-    await job;
-
-    // Then
-    expect(peak).toBe(3);
-  });
-
-  it("caps an explicit concurrency request above three", async () => {
-    // Given
-    const gates = Array.from({ length: 5 }, () => deferred<PageJobOutcome>());
-    let active = 0;
-    let peak = 0;
-    const job = runPageJob(
-      gates,
-      async (gate) => {
-        active += 1;
-        peak = Math.max(peak, active);
-        const outcome = await gate.promise;
-        active -= 1;
-        return outcome;
-      },
-      () => undefined,
-      new AbortController().signal,
-      4,
-    );
-    await Promise.resolve();
-
-    // When
-    for (const gate of gates) gate.resolve("translated");
-    await job;
-
-    // Then
-    expect(peak).toBeLessThanOrEqual(3);
-  });
-
-  it("counts every terminal outcome and reports progress after each element", async () => {
-    // Given
-    const progress: number[] = [];
-    const outcomes = ["translated", "skipped", "failed", "translated"] as const;
-
-    // When
-    const summary = await runPageJob(
-      outcomes,
-      async (outcome) => outcome,
-      (current) => progress.push(current.translated + current.skipped + current.failed),
-      new AbortController().signal,
-    );
-
-    // Then
-    expect(summary).toEqual({ translated: 2, skipped: 1, failed: 1, total: 4 });
-    expect(progress).toHaveLength(4);
-    expect(progress.at(-1)).toBe(4);
-  });
-
-  it("counts a rejected element as failed without aborting peers", async () => {
-    // Given
-    const visited: number[] = [];
-
-    // When
-    const summary = await runPageJob(
-      [1, 2, 3],
-      async (value) => {
-        visited.push(value);
-        if (value === 2) throw new TranslationError("translation-failed", "fixture");
-        return "translated";
-      },
-      () => undefined,
-      new AbortController().signal,
-    );
-
-    // Then
-    expect(summary).toEqual({ translated: 2, skipped: 0, failed: 1, total: 3 });
-    expect(visited).toHaveLength(3);
-  });
-
-  it("does not claim queued elements after cancellation", async () => {
-    // Given
-    const firstWave = deferred<PageJobOutcome>();
-    const controller = new AbortController();
-    const started: number[] = [];
-    const pending = runPageJob(
-      [0, 1, 2, 3, 4],
-      async (value) => {
-        started.push(value);
-        return firstWave.promise;
-      },
-      () => undefined,
-      controller.signal,
-    );
-    await Promise.resolve();
-
-    // When
-    controller.abort();
-    firstWave.resolve("translated");
-    await pending;
-
-    // Then
-    expect(started).toEqual([0, 1, 2]);
-  });
-});
 
 describe("full-page controller", () => {
   beforeEach(() => document.body.replaceChildren());

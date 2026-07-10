@@ -128,6 +128,42 @@ describe("per-element retranslation", () => {
     expect(sourceSelect).not.toBeUndefined();
   });
 
+  it("renders the menu in a fixed body overlay without inserting beside the source", async () => {
+    // Given
+    const container = document.createElement("section");
+    const source = document.createElement("p");
+    source.textContent = "Hello";
+    container.append(source);
+    document.body.append(container);
+    const menu = createElementMenu(document, LANGUAGES);
+
+    // When
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+
+    // Then
+    expect(document.body.lastElementChild).toBe(host);
+    expect(host?.style.position).toBe("fixed");
+    expect(source.nextElementSibling).toBeNull();
+
+    menu.destroy();
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+  });
+
+  it("cancels when a pointer interaction occurs outside the menu overlay", async () => {
+    // Given
+    const source = sourceFixture();
+    const menu = createElementMenu(document, LANGUAGES);
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+
+    // When
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true, composed: true }));
+
+    // Then
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+    expect(document.querySelector('[data-local-translator-ui="element-menu"]')).toBeNull();
+  });
+
   it("returns an explicit language pair from native selects", async () => {
     // Given
     const source = sourceFixture();

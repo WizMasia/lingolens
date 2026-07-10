@@ -31,10 +31,11 @@ type MenuControls = Readonly<{
 type OpenMenu = Readonly<{
   host: HTMLElement;
   finish(result: ElementMenuResult): void;
+  outsidePointer: EventListener;
 }>;
 
 const MENU_STYLES = `
-  :host { display: block; margin-block: var(--lt-space-2, 8px); }
+  :host { display: block; }
   .surface { background: var(--lt-color-paper, #f7f4ec); border: var(--lt-border,
     1px solid rgb(23 32 27 / 12%)); border-radius: var(--lt-radius, 10px);
     color: var(--lt-color-ink, #17201b); display: grid; gap: var(--lt-space-2, 8px);
@@ -77,16 +78,23 @@ export const createElementMenu = (
         style.textContent = MENU_STYLES;
         const finish = (result: ElementMenuResult): void => {
           if (current?.host !== host) return;
+          document.removeEventListener("pointerdown", current.outsidePointer, true);
           host.remove();
           current = null;
           currentStatus = null;
           resolve(result);
         };
-        current = { host, finish };
+        const outsidePointer: EventListener = (event) => {
+          if (event.composedPath().includes(host)) return;
+          finish({ kind: "cancel" });
+        };
+        current = { host, finish, outsidePointer };
         currentStatus = controls.status;
         wireControls(shadow, controls, finish, anchor);
         shadow.append(style, controls.surface);
-        anchor.after(host);
+        positionOverlay(host, anchor);
+        document.body.append(host);
+        document.addEventListener("pointerdown", outsidePointer, true);
         controls.source.focus();
       });
     },
@@ -97,6 +105,14 @@ export const createElementMenu = (
       closeCurrent({ kind: "cancel" });
     },
   };
+};
+
+const positionOverlay = (host: HTMLElement, anchor: HTMLElement): void => {
+  const rect = anchor.getBoundingClientRect();
+  host.style.position = "fixed";
+  host.style.insetInlineStart = `${Math.max(0, rect.left)}px`;
+  host.style.insetBlockStart = `${Math.max(0, rect.bottom)}px`;
+  host.style.zIndex = "2147483647";
 };
 
 const createControls = (

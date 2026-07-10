@@ -11,6 +11,7 @@ const IDLE_STATE: TabState = {
 export type BackgroundDependencies = Readonly<{
   activeTabId(): Promise<number | undefined>;
   broadcastSettings(): void;
+  requestTabState(tabId: number): Promise<TabState>;
 }>;
 
 export type BackgroundCoordinator = Readonly<{
@@ -33,7 +34,17 @@ export const createBackgroundCoordinator = (
           return undefined;
         case "get-tab-state": {
           const tabId = await dependencies.activeTabId();
-          return tabId === undefined ? IDLE_STATE : (states.get(tabId) ?? IDLE_STATE);
+          if (tabId === undefined) return IDLE_STATE;
+          const cached = states.get(tabId);
+          if (cached !== undefined) return cached;
+          try {
+            const state = await dependencies.requestTabState(tabId);
+            states.set(tabId, state);
+            return state;
+          } catch (error: unknown) {
+            if (error instanceof Error) return IDLE_STATE;
+            throw error;
+          }
         }
         case "settings-changed":
           dependencies.broadcastSettings();
@@ -71,6 +82,11 @@ if (typeof chrome !== "undefined") {
           void chrome.tabs.sendMessage(tab.id, { type: "settings-changed" }).catch(() => undefined);
         }
       });
+    },
+    async requestTabState(tabId) {
+      const response: unknown = await chrome.tabs.sendMessage(tabId, { type: "get-tab-state" });
+      const message = parseMessage({ type: "tab-state", state: response });
+      return message?.type === "tab-state" ? message.state : IDLE_STATE;
     },
   });
   chrome.runtime.onMessage.addListener((value: unknown, sender) =>

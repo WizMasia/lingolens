@@ -16,6 +16,7 @@ describe("background coordinator", () => {
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => 7,
       broadcastSettings: broadcast,
+      requestTabState: vi.fn(),
     });
     coordinator.receive({ type: "tab-state", state: complete }, 7);
     await expect(coordinator.receive({ type: "get-tab-state" })).resolves.toEqual(complete);
@@ -26,6 +27,7 @@ describe("background coordinator", () => {
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => activeTab,
       broadcastSettings: vi.fn(),
+      requestTabState: vi.fn().mockRejectedValue(new Error("content unavailable")),
     });
     coordinator.receive({ type: "tab-state", state: complete }, 8);
     coordinator.removeTab(8);
@@ -39,8 +41,21 @@ describe("background coordinator", () => {
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => undefined,
       broadcastSettings: broadcast,
+      requestTabState: vi.fn(),
     });
     coordinator.settingsChanged();
     expect(broadcast).toHaveBeenCalledOnce();
+  });
+
+  it("recovers live state from the active content script after a worker restart", async () => {
+    const requestTabState = vi.fn().mockResolvedValue(complete);
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      broadcastSettings: vi.fn(),
+      requestTabState,
+    });
+
+    await expect(coordinator.receive({ type: "get-tab-state" })).resolves.toEqual(complete);
+    expect(requestTabState).toHaveBeenCalledWith(7);
   });
 });

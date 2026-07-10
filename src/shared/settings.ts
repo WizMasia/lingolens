@@ -137,3 +137,19 @@ export function matchesTrigger(event: KeyboardEvent, trigger: TriggerBinding): b
     (key === "shift" ? false : event.shiftKey) === trigger.shift
   );
 }
+
+export function matchesMenuTrigger(event: KeyboardEvent, trigger: TriggerBinding): boolean {
+  if (event.repeat || !event.altKey) {
+    return false;
+  }
+
+  const key = normalizedKey(event.key);
+  const triggerKey = normalizedKey(trigger.key);
+
+  return (
+    key === triggerKey &&
+    (key === "control" ? false : event.ctrlKey) === trigger.ctrl &&
+    (key === "meta" ? false : event.metaKey) === trigger.meta &&
+    (key === "shift" ? false : event.shiftKey) === trigger.shift
+  );
+}

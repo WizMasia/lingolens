@@ -1,6 +1,11 @@
 import { Window } from "happy-dom";
 import { describe, expect, it } from "vitest";
-import { matchesTrigger, parseSettings, resolveBrowserTarget } from "../../src/shared/settings";
+import {
+  matchesMenuTrigger,
+  matchesTrigger,
+  parseSettings,
+  resolveBrowserTarget,
+} from "../../src/shared/settings";
 
 describe("settings", () => {
   it("falls back from an unusable browser language to Korean", () => {
@@ -60,6 +65,30 @@ describe("settings", () => {
     });
 
     expect(matchesTrigger(event, parseSettings(undefined, "ko").trigger)).toBe(true);
+
+    if (originalKeyboardEvent === undefined) {
+      Reflect.deleteProperty(globalThis, "KeyboardEvent");
+    } else {
+      Object.defineProperty(globalThis, "KeyboardEvent", originalKeyboardEvent);
+    }
+  });
+
+  it("classifies Alt plus Control as an element-menu trigger instead of a primary trigger", () => {
+    const window = new Window();
+    const originalKeyboardEvent = Object.getOwnPropertyDescriptor(globalThis, "KeyboardEvent");
+    Object.defineProperty(globalThis, "KeyboardEvent", {
+      configurable: true,
+      value: window.KeyboardEvent,
+    });
+    const trigger = parseSettings(undefined, "ko").trigger;
+    const event = new KeyboardEvent("keydown", {
+      key: "Control",
+      ctrlKey: true,
+      altKey: true,
+    });
+
+    expect(matchesTrigger(event, trigger)).toBe(false);
+    expect(matchesMenuTrigger(event, trigger)).toBe(true);
 
     if (originalKeyboardEvent === undefined) {
       Reflect.deleteProperty(globalThis, "KeyboardEvent");

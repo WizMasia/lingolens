@@ -24,7 +24,7 @@ Object.defineProperty(testWindow.HTMLElement.prototype, "getClientRects", {
 });
 Object.defineProperty(testWindow, "getComputedStyle", {
   configurable: true,
-  value: () => ({ display: "block", visibility: "visible" }),
+  value: () => ({ display: "block", opacity: "", visibility: "visible" }),
 });
 Object.defineProperty(globalThis, "getComputedStyle", {
   configurable: true,
@@ -76,6 +76,28 @@ describe("content entry", () => {
     );
     await Promise.resolve();
     expect(controller.translateTarget).toHaveBeenCalledOnce();
+  });
+
+  it("opens an element menu for a hovered target with Alt plus Control without translating", async () => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Meaningful text to translate";
+    document.body.append(paragraph);
+    const controller = controllerFixture();
+    createContentApp(document, { controller, loadSettings: async () => SETTINGS });
+    paragraph.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    expect(controller.setHovered).toHaveBeenCalledWith(paragraph);
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Control",
+        ctrlKey: true,
+        altKey: true,
+        bubbles: true,
+      }),
+    );
+    await Promise.resolve();
+
+    expect(controller.openElementMenu).toHaveBeenCalledWith(paragraph);
+    expect(controller.translateTarget).not.toHaveBeenCalled();
   });
 
   it("tracks the composed shadow target instead of the retargeted host", () => {

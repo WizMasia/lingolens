@@ -29,7 +29,7 @@ const DEFAULT_TRIGGER: TriggerBinding = {
   shift: false,
 };
 
-const RESERVED_TRIGGER_KEYS = new Set(["escape", "tab", "enter"]);
+const RESERVED_TRIGGER_KEYS = new Set(["alt", "escape", "tab", "enter"]);
 
 function isRecord(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);

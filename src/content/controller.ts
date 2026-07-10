@@ -174,10 +174,6 @@ export const createTranslationController = (
         restoreElement(target);
         return;
       }
-      if (record.phase === "error") {
-        await openMenu(record);
-        return;
-      }
       await perform({
         source: target,
         preference: settings.source,

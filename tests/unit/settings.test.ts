@@ -67,6 +67,15 @@ describe("settings", () => {
     ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
   });
 
+  it("rejects bare Alt as a saved primary translation trigger", () => {
+    expect(
+      parseSettings(
+        { trigger: { key: "aLt", ctrl: false, alt: false, meta: false, shift: false } },
+        "ko-KR",
+      ).trigger,
+    ).toEqual({ key: "Control", ctrl: false, alt: false, meta: false, shift: false });
+  });
+
   it("matches modifier-only Control without firing on repeats", () => {
     const window = new Window();
     const originalKeyboardEvent = Object.getOwnPropertyDescriptor(globalThis, "KeyboardEvent");

@@ -7,6 +7,7 @@ import {
 
 const adapterWith = (createTranslator: AiAdapter["createTranslator"]): AiAdapter => ({
   detect: vi.fn(),
+  detectWithChrome: vi.fn().mockResolvedValue(undefined),
   availability: vi.fn().mockResolvedValue("available"),
   createTranslator,
   destroy: vi.fn(),
@@ -18,6 +19,7 @@ describe("translator cache", () => {
     const translate = vi.fn<AiTranslator["translate"]>().mockImplementation(async (text) => text);
     const adapter: AiAdapter = {
       detect: vi.fn().mockResolvedValue([{ detectedLanguage: "en", confidence: 0.99 }]),
+      detectWithChrome: vi.fn().mockResolvedValue(undefined),
       availability: vi.fn().mockResolvedValue("available"),
       createTranslator: vi.fn().mockResolvedValue({ translate, destroy: vi.fn() }),
       destroy: vi.fn(),

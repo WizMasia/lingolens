@@ -4,9 +4,10 @@ import { createChromiumAiAdapter } from "../../src/content/chromium-ai-adapter";
 
 const detectorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "LanguageDetector");
 const translatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Translator");
+const chromeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "chrome");
 
 const restoreGlobal = (
-  name: "LanguageDetector" | "Translator",
+  name: "LanguageDetector" | "Translator" | "chrome",
   descriptor?: PropertyDescriptor,
 ) => {
   if (descriptor === undefined) {
@@ -19,9 +20,59 @@ const restoreGlobal = (
 afterEach(() => {
   restoreGlobal("LanguageDetector", detectorDescriptor);
   restoreGlobal("Translator", translatorDescriptor);
+  restoreGlobal("chrome", chromeDescriptor);
 });
 
 describe("Chromium AI adapter", () => {
+  it("maps Chrome i18n language evidence", async () => {
+    const detectLanguage: (text: string) => Promise<{
+      readonly isReliable: boolean;
+      readonly languages: readonly Readonly<{ language: string; percentage: number }>[];
+    }> = vi.fn().mockResolvedValue({
+      isReliable: true,
+      languages: [
+        { language: "fr", percentage: 91 },
+        { language: "en", percentage: 9 },
+      ],
+    });
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: { i18n: { detectLanguage } },
+    });
+
+    const adapter = createChromiumAiAdapter();
+
+    await expect(adapter.detectWithChrome("Bonjour tout le monde")).resolves.toEqual({
+      reliable: true,
+      languages: [
+        { language: "fr", percentage: 91 },
+        { language: "en", percentage: 9 },
+      ],
+    });
+  });
+
+  it("returns no secondary evidence when Chrome i18n fails", async () => {
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: {
+        i18n: { detectLanguage: vi.fn().mockRejectedValue(new Error("CLD failed")) },
+      },
+    });
+
+    await expect(
+      createChromiumAiAdapter().detectWithChrome("Brief"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rethrows non-Error Chrome i18n failures", async () => {
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: { i18n: { detectLanguage: vi.fn().mockRejectedValue("CLD failed") } },
+    });
+
+    await expect(createChromiumAiAdapter().detectWithChrome("Brief")).rejects.toBe("CLD failed");
+  });
+
   it("reports API absence without reading missing globals", async () => {
     // Given
     Reflect.deleteProperty(globalThis, "LanguageDetector");

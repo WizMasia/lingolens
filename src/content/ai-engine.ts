@@ -9,6 +9,11 @@ export type AiDetection = Readonly<{
   confidence?: number;
 }>;
 
+export type AiSecondaryDetection = Readonly<{
+  reliable: boolean;
+  languages: readonly Readonly<{ language: string; percentage: number }>[];
+}>;
+
 export type AiTranslator = Readonly<{
   translate(text: string): Promise<string>;
   destroy(): void;
@@ -16,6 +21,7 @@ export type AiTranslator = Readonly<{
 
 export type AiAdapter = Readonly<{
   detect(text: string): Promise<readonly AiDetection[]>;
+  detectWithChrome(text: string): Promise<AiSecondaryDetection | undefined>;
   availability(source: string, target: string): Promise<AiAvailability>;
   createTranslator(source: string, target: string): Promise<AiTranslator>;
   destroy(): void;

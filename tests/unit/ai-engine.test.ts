@@ -23,6 +23,7 @@ const makeAdapter = (options: AdapterOptions = {}): AiAdapter => ({
       confidence: options.confidence ?? 0.99,
     },
   ]),
+  detectWithChrome: vi.fn().mockResolvedValue(undefined),
   availability: vi.fn().mockResolvedValue(options.availability ?? "available"),
   createTranslator:
     options.createTranslator ??

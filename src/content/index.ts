@@ -1,6 +1,11 @@
 import { LANGUAGE_CHOICES } from "../shared/languages";
 import { parseMessage } from "../shared/protocol";
-import { matchesTrigger, parseSettings, type Settings } from "../shared/settings";
+import {
+  matchesMenuTrigger,
+  matchesTrigger,
+  parseSettings,
+  type Settings,
+} from "../shared/settings";
 import { createTranslationEngine } from "./ai-engine";
 import { createChromiumAiAdapter } from "./chromium-ai-adapter";
 import { createTranslationController, type TranslationController } from "./controller";
@@ -29,12 +34,20 @@ export const createContentApp = (
   dependencies: ContentDependencies,
 ): ContentApp => {
   let settings = dependencies.controller.settings;
+  let currentTarget: HTMLElement | null = null;
 
   const onPointer = (event: PointerEvent): void => {
-    dependencies.controller.setHovered(nearestTarget(eventElement(event)) ?? null);
+    currentTarget = nearestTarget(eventElement(event)) ?? null;
+    dependencies.controller.setHovered(currentTarget);
   };
   const onKey = (event: KeyboardEvent): void => {
     if (isEditable(event.composedPath()[0])) return;
+    if (matchesMenuTrigger(event, settings.trigger)) {
+      event.preventDefault();
+      const target = currentTarget ?? nearestTarget(eventElement(event));
+      if (target !== undefined) void dependencies.controller.openElementMenu(target);
+      return;
+    }
     if (!matchesTrigger(event, settings.trigger)) return;
     event.preventDefault();
     void dependencies.controller.translateTarget();

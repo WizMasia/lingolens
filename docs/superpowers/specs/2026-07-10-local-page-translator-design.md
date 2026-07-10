@@ -76,12 +76,13 @@ The extension never writes translated HTML. All results are inserted as text to 
 
 ### 3.5 Per-element retranslation
 
-Each translated element can be retranslated with the configured trigger key:
+Each translated element uses the configured trigger as a toggle and Alt plus that trigger for retranslation:
 
 - inline mode places the action in the translation block;
 - hover mode inserts no action surface or sibling element;
 - existing focusable sources can temporarily show the translation on focus;
-- pressing the configured trigger on an already translated source opens the language control.
+- pressing the configured trigger on an already translated source restores the original;
+- pressing Alt plus the configured trigger opens the language control.
 
 The control provides source language (`Auto detect` or explicit) and target language selectors. Confirming `Translate again` affects only that element and does not alter global options. The new result replaces the existing result atomically. If model download or translation fails, the existing result is retained for inline mode and a persistent extension announcement reports the error; hover mode restores the original source text without adding page UI.
 

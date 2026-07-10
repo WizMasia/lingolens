@@ -29,7 +29,7 @@ bun run build
 - Open the toolbar popup and select **페이지 전체 번역** to translate the current page.
 - Select **원문 복원** to remove every translation created by the extension.
 - By default, press `Ctrl` while text is selected or while the pointer is over a text element to translate that element.
-- Press the trigger again on an already translated element to select an explicit source and target language and translate it again.
+- Press the trigger again on an already translated element to restore its original text. Press `Alt` plus the trigger to select explicit source and target languages; the floating menu also shows the language detected for that element.
 - Open **설정** to choose inline or hover replacement display, a fixed source or automatic per-element detection, a browser-default or fixed target, and a custom trigger.
 
 Automatic detection is less reliable for single words. The extension uses an explicit `lang` attribute and nearby text as hints; when confidence is still low, choose the source language from the element menu.

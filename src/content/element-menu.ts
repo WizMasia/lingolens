@@ -11,6 +11,7 @@ export type ElementMenuResult =
 export type ElementMenuSelection = Readonly<{
   source: "auto" | string;
   target: string;
+  detectedSource?: string;
 }>;
 
 export type ElementMenu = Readonly<{
@@ -31,10 +32,11 @@ type MenuControls = Readonly<{
 type OpenMenu = Readonly<{
   host: HTMLElement;
   finish(result: ElementMenuResult): void;
+  outsidePointer: EventListener;
 }>;
 
 const MENU_STYLES = `
-  :host { display: block; margin-block: var(--lt-space-2, 8px); }
+  :host { display: block; }
   .surface { background: var(--lt-color-paper, #f7f4ec); border: var(--lt-border,
     1px solid rgb(23 32 27 / 12%)); border-radius: var(--lt-radius, 10px);
     color: var(--lt-color-ink, #17201b); display: grid; gap: var(--lt-space-2, 8px);
@@ -46,6 +48,7 @@ const MENU_STYLES = `
   select { background: white; border: var(--lt-border, 1px solid rgb(23 32 27 / 12%));
     border-radius: var(--lt-radius, 10px); color: inherit; padding-inline: var(--lt-space-2, 8px); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--lt-space-2, 8px); }
+  .detected { color: var(--lt-color-muted, #5b625d); margin: 0; }
   button { background: transparent; border: 0; color: var(--lt-color-moss, #2f6d4f);
     cursor: pointer; min-inline-size: var(--lt-target-min, 44px); padding-inline: var(--lt-space-2, 8px); }
   button[data-action="restore"] { color: var(--lt-color-danger, #a33a32); }
@@ -77,16 +80,23 @@ export const createElementMenu = (
         style.textContent = MENU_STYLES;
         const finish = (result: ElementMenuResult): void => {
           if (current?.host !== host) return;
+          document.removeEventListener("pointerdown", current.outsidePointer, true);
           host.remove();
           current = null;
           currentStatus = null;
           resolve(result);
         };
-        current = { host, finish };
+        const outsidePointer: EventListener = (event) => {
+          if (event.composedPath().includes(host)) return;
+          finish({ kind: "cancel" });
+        };
+        current = { host, finish, outsidePointer };
         currentStatus = controls.status;
         wireControls(shadow, controls, finish, anchor);
         shadow.append(style, controls.surface);
-        anchor.after(host);
+        positionOverlay(host, anchor);
+        document.body.append(host);
+        document.addEventListener("pointerdown", outsidePointer, true);
         controls.source.focus();
       });
     },
@@ -97,6 +107,14 @@ export const createElementMenu = (
       closeCurrent({ kind: "cancel" });
     },
   };
+};
+
+const positionOverlay = (host: HTMLElement, anchor: HTMLElement): void => {
+  const rect = anchor.getBoundingClientRect();
+  host.style.position = "fixed";
+  host.style.insetInlineStart = `${Math.max(0, rect.left)}px`;
+  host.style.insetBlockStart = `${Math.max(0, rect.bottom)}px`;
+  host.style.zIndex = "2147483647";
 };
 
 const createControls = (
@@ -118,6 +136,9 @@ const createControls = (
   target.value = selection.target;
   const sourceLabel = labeled(document, "Source language", source);
   const targetLabel = labeled(document, "Target language", target);
+  const detected = document.createElement("p");
+  detected.className = "detected";
+  detected.textContent = `Detected source: ${detectedSourceLabel(languages, selection.detectedSource)}`;
   const actions = document.createElement("div");
   actions.className = "actions";
   const translate = actionButton(document, "translate", "Translate again");
@@ -127,7 +148,7 @@ const createControls = (
   status.className = "status";
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
-  surface.append(sourceLabel, targetLabel, actions, status);
+  surface.append(detected, sourceLabel, targetLabel, actions, status);
   return { surface, source, target, translate, restore, status };
 };
 
@@ -142,13 +163,14 @@ const wireControls = (
   });
   controls.restore.addEventListener("click", () => finish({ kind: "restore" }));
   shadow.addEventListener("keydown", (event) => {
-    if (!(event instanceof KeyboardEvent)) return;
-    if (event.key !== "Escape") return;
+    if (!isEscapeKey(event)) return;
     event.preventDefault();
     finish({ kind: "cancel" });
     anchor.focus();
   });
 };
+
+const isEscapeKey = (event: Event): boolean => "key" in event && event.key === "Escape";
 
 const appendLanguages = (
   select: HTMLSelectElement,
@@ -160,6 +182,14 @@ const appendLanguages = (
     appendOption(select, language.value, language.label);
     values.add(language.value);
   }
+};
+
+const detectedSourceLabel = (
+  languages: readonly ElementLanguageChoice[],
+  detectedSource: string | undefined,
+): string => {
+  if (detectedSource === undefined) return "Unknown";
+  return languages.find(({ value }) => value === detectedSource)?.label ?? detectedSource;
 };
 
 const appendOption = (select: HTMLSelectElement, value: string, label: string): void => {

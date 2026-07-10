@@ -128,6 +128,134 @@ describe("per-element retranslation", () => {
     expect(sourceSelect).not.toBeUndefined();
   });
 
+  it("cancels on a key-shaped Escape event", async () => {
+    // Given
+    const source = sourceFixture();
+    source.tabIndex = 0;
+    source.focus();
+    const menu = createElementMenu(document, LANGUAGES);
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    if (host === null) throw new Error("fixture menu missing");
+    const sourceSelect = shadowRoots
+      .get(host)
+      ?.querySelector<HTMLSelectElement>('select[name="source"]');
+    if (sourceSelect === null || sourceSelect === undefined) {
+      throw new Error("fixture source select missing");
+    }
+    const escapeEvent = new Event("keydown", { bubbles: true });
+    Object.defineProperty(escapeEvent, "key", { value: "Escape" });
+
+    // When
+    sourceSelect.dispatchEvent(escapeEvent);
+    const remainingHost = document.querySelector('[data-local-translator-ui="element-menu"]');
+    menu.destroy();
+
+    // Then
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+    expect(remainingHost).toBeNull();
+    expect(document.activeElement).toBe(source);
+  });
+
+  it("renders the menu in a fixed body overlay without inserting beside the source", async () => {
+    // Given
+    const container = document.createElement("section");
+    const source = document.createElement("p");
+    source.textContent = "Hello";
+    container.append(source);
+    document.body.append(container);
+    const menu = createElementMenu(document, LANGUAGES);
+
+    // When
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+
+    // Then
+    expect(document.body.lastElementChild).toBe(host);
+    expect(host?.style.position).toBe("fixed");
+    expect(source.nextElementSibling).toBeNull();
+
+    menu.destroy();
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+  });
+
+  it("shows the detected source language after a successful translation", async () => {
+    // Given
+    const source = sourceFixture();
+    const engine: TranslationEngine = {
+      async translate() {
+        return result("안녕하세요", "ko");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      languages: LANGUAGES,
+      settings: SETTINGS,
+    });
+    await controller.translateTarget(source);
+
+    // When
+    const pending = controller.openElementMenu(source);
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    const menuText = host === null ? "" : (shadowRoots.get(host)?.textContent ?? "");
+
+    // Then
+    expect(menuText).toContain("Detected source: English");
+
+    controller.destroy();
+    await pending;
+  });
+
+  it("shows an unknown detected source before the element has a successful translation", async () => {
+    // Given
+    const source = sourceFixture();
+    const engine: TranslationEngine = {
+      async translate() {
+        return result("안녕하세요", "ko");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({
+      document,
+      engine,
+      languages: LANGUAGES,
+      settings: SETTINGS,
+    });
+
+    // When
+    const pending = controller.openElementMenu(source);
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
+    const menuText = host === null ? "" : (shadowRoots.get(host)?.textContent ?? "");
+
+    // Then
+    expect(menuText).toContain("Detected source: Unknown");
+
+    controller.destroy();
+    await pending;
+  });
+
+  it("cancels when a pointer interaction occurs outside the menu overlay", async () => {
+    // Given
+    const source = sourceFixture();
+    const menu = createElementMenu(document, LANGUAGES);
+    const pending = menu.open(source, { source: "auto", target: "ko" });
+
+    // When
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true, composed: true }));
+
+    // Then
+    await expect(pending).resolves.toEqual({ kind: "cancel" });
+    expect(document.querySelector('[data-local-translator-ui="element-menu"]')).toBeNull();
+  });
+
   it("returns an explicit language pair from native selects", async () => {
     // Given
     const source = sourceFixture();

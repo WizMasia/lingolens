@@ -75,7 +75,7 @@ describe("unknown source action", () => {
     expect(opened).toBe(1);
   });
 
-  it("opens language selection from a hover-mode error with the trigger again", async () => {
+  it("retries a hover-mode error with the primary trigger and opens language selection explicitly", async () => {
     const source = document.createElement("p");
     source.textContent = "Brief";
     document.body.append(source);
@@ -88,8 +88,10 @@ describe("unknown source action", () => {
       announce() {},
       destroy() {},
     };
+    let attempts = 0;
     const engine: TranslationEngine = {
       async translate() {
+        attempts += 1;
         return { kind: "unknown-source" };
       },
       async availability() {
@@ -106,7 +108,9 @@ describe("unknown source action", () => {
 
     await controller.translateTarget(source);
     await controller.translateTarget(source);
+    await controller.openElementMenu(source);
 
+    expect(attempts).toBe(2);
     expect(opened).toBe(1);
     expect(document.querySelector('[data-local-translator-ui="hover"]')).toBeNull();
   });

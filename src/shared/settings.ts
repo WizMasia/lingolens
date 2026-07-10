@@ -29,7 +29,7 @@ const DEFAULT_TRIGGER: TriggerBinding = {
   shift: false,
 };
 
-const RESERVED_TRIGGER_KEYS = new Set(["escape", "tab", "enter"]);
+const RESERVED_TRIGGER_KEYS = new Set(["alt", "escape", "tab", "enter"]);
 
 function isRecord(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -79,13 +79,14 @@ function parseTrigger(value: unknown): TriggerBinding {
     "key" in value && typeof value.key === "string" && value.key.length > 0
       ? value.key
       : DEFAULT_TRIGGER.key;
+  const alt = "alt" in value && typeof value.alt === "boolean" ? value.alt : DEFAULT_TRIGGER.alt;
 
-  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key))) return DEFAULT_TRIGGER;
+  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key)) || alt) return DEFAULT_TRIGGER;
 
   return {
     key,
     ctrl: "ctrl" in value && typeof value.ctrl === "boolean" ? value.ctrl : DEFAULT_TRIGGER.ctrl,
-    alt: "alt" in value && typeof value.alt === "boolean" ? value.alt : DEFAULT_TRIGGER.alt,
+    alt,
     meta: "meta" in value && typeof value.meta === "boolean" ? value.meta : DEFAULT_TRIGGER.meta,
     shift:
       "shift" in value && typeof value.shift === "boolean" ? value.shift : DEFAULT_TRIGGER.shift,
@@ -133,6 +134,22 @@ export function matchesTrigger(event: KeyboardEvent, trigger: TriggerBinding): b
     key === triggerKey &&
     (key === "control" ? false : event.ctrlKey) === trigger.ctrl &&
     (key === "alt" ? false : event.altKey) === trigger.alt &&
+    (key === "meta" ? false : event.metaKey) === trigger.meta &&
+    (key === "shift" ? false : event.shiftKey) === trigger.shift
+  );
+}
+
+export function matchesMenuTrigger(event: KeyboardEvent, trigger: TriggerBinding): boolean {
+  if (event.repeat || !event.altKey) {
+    return false;
+  }
+
+  const key = normalizedKey(event.key);
+  const triggerKey = normalizedKey(trigger.key);
+
+  return (
+    key === triggerKey &&
+    (key === "control" ? false : event.ctrlKey) === trigger.ctrl &&
     (key === "meta" ? false : event.metaKey) === trigger.meta &&
     (key === "shift" ? false : event.shiftKey) === trigger.shift
   );

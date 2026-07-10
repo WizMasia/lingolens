@@ -94,3 +94,63 @@ interface addition.
 
 The temporary `.debug-journal.md` is removed before the Task 7 commit. No debug
 instrumentation, temporary scripts, or background processes were introduced.
+
+## Review recovery: late retranslation and hover inspection
+
+The review found two lifecycle holes after the original Task 7 commit.
+
+### RED evidence
+
+```text
+bun test tests/dom/page-jobs.test.ts tests/dom/stale-content.test.ts
+17 pass
+2 fail
+```
+
+1. A translated record was retranslated, `restorePage()` cleared the store, and
+   the pending engine promise then resolved. The new regression received
+   `store.active.length === 1`, proving the old record completed and re-entered
+   the active set after restoration.
+2. A hover source received a normal child-list mutation whose final source
+   fingerprint remained unchanged. The regression received `"Hello"` after a
+   subsequent hover where it expected `"안녕하세요"`, proving the inspection
+   restorer had removed the hover entry and its listeners.
+3. The first failure was not caused by active page-job publication: the case
+   uses the element retranslation path directly and still reproduced after the
+   restore returned idle. The late commit was therefore owned by
+   `executeTranslation`, not by `PageController` state publication.
+
+### GREEN fix
+
+- `RecordStore.has(record)` now verifies that a record is still the current
+  store-owned record for its source. `executeTranslation` checks this identity
+  immediately after the engine promise resolves or rejects, before cancelled
+  recovery, success, stale, error, rendering, or announcement paths can mutate
+  the orphaned record.
+- Hover view lifecycle handling now treats `inspect` as temporary text
+  restoration only. Terminal lifecycle reasons still remove listeners, action
+  UI, tabindex ownership, and the entry.
+
+The focused regressions then passed:
+
+```text
+19 pass
+0 fail
+35 expect() calls
+```
+
+### Final verification after review recovery
+
+```text
+bun test                         # 108 pass, 0 fail
+bun run check                    # exit 0
+bun run build                    # exit 0
+git diff --check                 # exit 0
+```
+
+The changed TypeScript source and focused tests were also searched for
+`any`, TypeScript suppression directives, non-null assertions, and debug
+logging; no forbidden escapes were found. The two focused regressions prove
+that a completed restore leaves no active records or translation UI after the
+pending promise settles, and that an unchanged-source observer inspection keeps
+hover translation available for a later pointer entry.

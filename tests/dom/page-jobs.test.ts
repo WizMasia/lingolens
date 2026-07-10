@@ -261,6 +261,40 @@ describe("full-page controller", () => {
     expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
   });
 
+  it("does not resurrect a pending retranslation after page restoration", async () => {
+    // Given
+    const [source] = addSources("One");
+    if (source === undefined) throw new Error("fixture source missing");
+    const gate = deferred<TranslationResult>();
+    let calls = 0;
+    const engine: TranslationEngine = {
+      translate(request) {
+        calls += 1;
+        return calls === 1 ? Promise.resolve(translated(request.text)) : gate.promise;
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.translateTarget(source);
+    const pending = controller.retranslate(source, { source: "auto", target: "ko" });
+    await Promise.resolve();
+
+    // When
+    controller.restorePage();
+    gate.resolve(translated("late"));
+    await pending;
+
+    // Then
+    expect(controller.store.active).toHaveLength(0);
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    source.textContent = "Updated after restore";
+    await Promise.resolve();
+    expect(controller.store.active).toHaveLength(0);
+  });
+
   it("updates existing blocks without duplication and captures new content on only the next run", async () => {
     // Given
     addSources("First");

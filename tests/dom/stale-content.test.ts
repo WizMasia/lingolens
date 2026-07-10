@@ -181,6 +181,30 @@ describe("stale page content", () => {
     expect(controller.store.getOrCreate(source).phase).toBe("translated");
   });
 
+  it("keeps hover translation available after an unchanged source mutation", async () => {
+    // Given
+    const source = document.createElement("p");
+    source.textContent = "Hello";
+    document.body.append(source);
+    const controller = createTranslationController({
+      document,
+      engine,
+      settings: { ...SETTINGS, displayMode: "hover" },
+    });
+    await controller.translateTarget(source);
+    source.dispatchEvent(new Event("pointerenter"));
+    source.append(document.createElement("span"));
+    await flushMutations();
+
+    // When
+    source.dispatchEvent(new Event("pointerleave"));
+    source.dispatchEvent(new Event("pointerenter"));
+
+    // Then
+    expect(source.textContent).toBe("안녕하세요");
+    expect(controller.store.getOrCreate(source).phase).toBe("translated");
+  });
+
   it("preserves a page-owned hover change and does not observe its own restoration", async () => {
     // Given
     const source = document.createElement("p");

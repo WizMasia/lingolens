@@ -44,6 +44,7 @@ export const executeTranslation = async (
   record.transition("translating");
   try {
     const result = await runtime.engine.translate(translationRequest(attempt, recordText(record)));
+    if (!runtime.store.has(record)) return false;
     if (attempt.signal?.aborted === true) {
       restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
       return false;
@@ -54,6 +55,7 @@ export const executeTranslation = async (
     }
     return commitResult({ record, result, fingerprint, runtime });
   } catch (error: unknown) {
+    if (!runtime.store.has(record)) return false;
     if (attempt.signal?.aborted === true) {
       restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
       return false;

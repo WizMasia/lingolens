@@ -194,6 +194,7 @@ export class ElementRecord {
 
 export type RecordStore = Readonly<{
   getOrCreate(source: HTMLElement): ElementRecord;
+  has(record: ElementRecord): boolean;
   active: ReadonlySet<ElementRecord>;
   markStale(record: ElementRecord): void;
   remove(source: HTMLElement): void;
@@ -215,6 +216,9 @@ export const createRecordStore = (): RecordStore => {
       const record = new ElementRecord(source, onPhaseChange);
       records.set(source, record);
       return record;
+    },
+    has(record) {
+      return records.get(record.source) === record;
     },
     markStale(record) {
       record.restoreView("stale");

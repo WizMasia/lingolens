@@ -1,4 +1,4 @@
-import type { ElementRecord, TextSnapshot, TranslationView } from "./records";
+import type { ElementRecord, RecordLifecycle, TextSnapshot, TranslationView } from "./records";
 
 export type HoverView = TranslationView;
 
@@ -64,7 +64,9 @@ export const createHoverView = (
   const render = (record: ElementRecord): void => {
     restore(record);
     if (record.lastSuccess === null || record.phase === "stale") return;
-    const entry = createEntry(record, actions, () => restore(record));
+    const entry = createEntry(record, actions, (reason) =>
+      reason === "inspect" ? restoreText(entry) : restore(record),
+    );
     entries.set(record, entry);
     addListeners(entry);
     record.source.after(entry.actionHost);
@@ -88,7 +90,7 @@ export const createHoverView = (
 const createEntry = (
   record: ElementRecord,
   actions: HoverViewActions,
-  deactivate: () => void,
+  onLifecycle: (reason: RecordLifecycle) => void,
 ): HoverEntry => {
   const { host, meta, status, button } = createActionSurface(record.source.ownerDocument);
   const originalTabIndex = record.source.getAttribute("tabindex");
@@ -124,7 +126,7 @@ const createEntry = (
       entry.focusActive = false;
       if (!movesInto(entry.actionHost, event)) settle(entry);
     },
-    unregisterRestorer: record.registerRestorer(deactivate),
+    unregisterRestorer: record.registerRestorer(onLifecycle),
     pointerActive: false,
     focusActive: false,
     suppressFocus: false,
@@ -196,11 +198,8 @@ const activate = (entry: HoverEntry): void => {
   const success = entry.record.lastSuccess;
   const target = firstNonEmpty(entry.record.currentSnapshot);
   if (success === null || target === null || entry.record.phase === "stale") return;
-  if (
-    !entry.translated &&
-    entry.record.currentSnapshot.some(({ node, value }) => node.data !== value)
-  )
-    return;
+  const hasPageChange = entry.record.currentSnapshot.some(({ node, value }) => node.data !== value);
+  if (!entry.translated && hasPageChange) return;
   if (!entry.translated) {
     entry.originalLang = entry.record.source.getAttribute("lang");
     entry.originalDir = entry.record.source.getAttribute("dir");

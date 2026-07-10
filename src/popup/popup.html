@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,9 +8,31 @@
     <link rel="stylesheet" href="styles/shell.css" />
   </head>
   <body class="lt-popup-shell">
-    <main aria-labelledby="lt-popup-title">
-      <h1 id="lt-popup-title">Local Page Translator</h1>
-      <p>Private, on-device page translation for Chrome.</p>
+    <main class="surface popup" aria-labelledby="lt-popup-title">
+      <header class="surface-header">
+        <div>
+          <p class="eyebrow">LOCAL · PRIVATE</p>
+          <h1 id="lt-popup-title">페이지 번역</h1>
+        </div>
+        <span class="privacy-badge" title="페이지 내용은 기기 밖으로 전송되지 않습니다">기기 내 처리</span>
+      </header>
+      <section class="status-panel" aria-labelledby="status">
+        <div class="status-row">
+          <p id="status" class="status-title" aria-live="polite">준비됨</p>
+          <span class="status-dot" aria-hidden="true"></span>
+        </div>
+        <progress id="progress" max="1" value="0" aria-label="번역 진행률"></progress>
+        <p id="counts" class="secondary">번역할 페이지를 준비해 주세요.</p>
+        <p id="error" class="error" role="alert"></p>
+      </section>
+      <div class="actions">
+        <button id="translate-page" class="button primary" type="button">페이지 전체 번역</button>
+        <button id="restore-page" class="button secondary-button" type="button">원문 복원</button>
+      </div>
+      <footer>
+        <span>Ctrl을 누르면 선택하거나 가리킨 요소를 번역합니다.</span>
+        <button id="open-options" class="text-button" type="button">설정</button>
+      </footer>
     </main>
     <script src="popup.js"></script>
   </body>

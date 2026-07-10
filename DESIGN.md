@@ -89,8 +89,8 @@ All margins, padding, and gaps use the spacing tokens. The popup is a single com
 
 - **Structure**: no injected visual element. The source element's own text temporarily becomes the translated text while it is hovered or focused.
 - **Variants**: translated on hover/focus, restored on leave/blur, unavailable, stale.
-- **States**: pointer hover and keyboard focus activate the same temporary replacement; leave, blur, Escape, restore, stale content, and teardown synchronously restore the original source. The configured trigger toggles translation, while Alt plus that trigger opens the fixed language menu.
-- **Accessibility**: hover never inserts focusable controls, changes page DOM order, or adds tab stops. Existing focusable source elements support keyboard activation; Alt plus the configured trigger opens retranslation controls for any translated source. Status and errors use the persistent extension live announcer.
+- **States**: pointer hover and keyboard focus activate the same temporary replacement; leave, blur, Escape, restore, stale content, and teardown synchronously restore the original source. The translation trigger toggles translation, while the separately configured menu trigger opens the fixed language menu.
+- **Accessibility**: hover never inserts focusable controls, changes page DOM order, or adds tab stops. Existing focusable source elements support keyboard activation; the independently configurable menu trigger opens retranslation controls for any translated source. Status and errors use the persistent extension live announcer.
 - **Motion**: no injected hover surface or decorative movement. Reduced-motion behavior is unchanged.
 
 ### Field Group
@@ -131,7 +131,7 @@ Extension-owned surfaces use paper with `--lt-border`, defined as `1px solid var
 
 - Target WCAG 2.2 AA. Text inside extension-owned surfaces maintains at least 4.5:1 contrast, and non-text controls maintain at least 3:1 contrast.
 - Every interactive target is at least 44px in both dimensions and has a visible 2px moss focus ring.
-- Popup, options, and injected inline blocks are fully keyboard reachable. Existing focusable source elements support hover-mode keyboard activation, while Alt plus the configured trigger opens retranslation controls for any translated source.
+- Popup, options, and injected inline blocks are fully keyboard reachable. Existing focusable source elements support hover-mode keyboard activation, while the independently configurable menu trigger opens retranslation controls for any translated source.
 - Progress and completion use polite live regions. Errors remain visible until resolved or dismissed.
 - Reduced motion removes transitions. User zoom, text scaling, high contrast settings, and logical RTL layout remain usable.
 - Shadow DOM isolates extension-owned styles from host pages. Owned controls use semantic HTML and do not alter the host document's reading order.

@@ -9,6 +9,8 @@
   max-inline-size: 58ch;
   margin-block-start: var(--lt-space-2);
   font-size: var(--lt-font-size-body);
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 form {
   display: grid;

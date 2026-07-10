@@ -19,6 +19,7 @@ export type Settings = Readonly<{
   source: SourcePreference;
   target: TargetPreference;
   trigger: TriggerBinding;
+  menuTrigger: TriggerBinding;
 }>;
 
 const DEFAULT_TRIGGER: TriggerBinding = {
@@ -29,7 +30,23 @@ const DEFAULT_TRIGGER: TriggerBinding = {
   shift: false,
 };
 
-const RESERVED_TRIGGER_KEYS = new Set(["alt", "escape", "tab", "enter"]);
+const DEFAULT_MENU_TRIGGER: TriggerBinding = {
+  key: "Control",
+  ctrl: false,
+  alt: false,
+  meta: false,
+  shift: true,
+};
+
+const COLLISION_MENU_TRIGGER: TriggerBinding = {
+  key: "L",
+  ctrl: true,
+  alt: false,
+  meta: false,
+  shift: true,
+};
+
+const RESERVED_TRIGGER_KEYS = new Set(["escape", "tab", "enter"]);
 
 function isRecord(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -70,26 +87,24 @@ function parseTarget(value: unknown, uiLanguage: string): TargetPreference {
   return { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) };
 }
 
-function parseTrigger(value: unknown): TriggerBinding {
+function parseTrigger(value: unknown, fallback: TriggerBinding): TriggerBinding {
   if (!isRecord(value)) {
-    return DEFAULT_TRIGGER;
+    return fallback;
   }
 
   const key =
     "key" in value && typeof value.key === "string" && value.key.length > 0
       ? value.key
-      : DEFAULT_TRIGGER.key;
-  const alt = "alt" in value && typeof value.alt === "boolean" ? value.alt : DEFAULT_TRIGGER.alt;
+      : fallback.key;
 
-  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key)) || alt) return DEFAULT_TRIGGER;
+  if (RESERVED_TRIGGER_KEYS.has(normalizedKey(key))) return fallback;
 
   return {
     key,
-    ctrl: "ctrl" in value && typeof value.ctrl === "boolean" ? value.ctrl : DEFAULT_TRIGGER.ctrl,
-    alt,
-    meta: "meta" in value && typeof value.meta === "boolean" ? value.meta : DEFAULT_TRIGGER.meta,
-    shift:
-      "shift" in value && typeof value.shift === "boolean" ? value.shift : DEFAULT_TRIGGER.shift,
+    ctrl: "ctrl" in value && typeof value.ctrl === "boolean" ? value.ctrl : fallback.ctrl,
+    alt: "alt" in value && typeof value.alt === "boolean" ? value.alt : fallback.alt,
+    meta: "meta" in value && typeof value.meta === "boolean" ? value.meta : fallback.meta,
+    shift: "shift" in value && typeof value.shift === "boolean" ? value.shift : fallback.shift,
   };
 }
 
@@ -104,8 +119,21 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
       trigger: DEFAULT_TRIGGER,
+      menuTrigger: DEFAULT_MENU_TRIGGER,
     };
   }
+
+  const trigger =
+    "trigger" in value ? parseTrigger(value.trigger, DEFAULT_TRIGGER) : DEFAULT_TRIGGER;
+  const parsedMenuTrigger =
+    "menuTrigger" in value
+      ? parseTrigger(value.menuTrigger, DEFAULT_MENU_TRIGGER)
+      : DEFAULT_MENU_TRIGGER;
+  const menuTrigger = sameTrigger(trigger, parsedMenuTrigger)
+    ? sameTrigger(trigger, DEFAULT_MENU_TRIGGER)
+      ? COLLISION_MENU_TRIGGER
+      : DEFAULT_MENU_TRIGGER
+    : parsedMenuTrigger;
 
   return {
     displayMode: "displayMode" in value ? parseDisplayMode(value.displayMode) : "hover",
@@ -114,7 +142,8 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
       "target" in value
         ? parseTarget(value.target, uiLanguage)
         : { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
-    trigger: "trigger" in value ? parseTrigger(value.trigger) : DEFAULT_TRIGGER,
+    trigger,
+    menuTrigger,
   };
 }
 
@@ -130,6 +159,16 @@ export function matchesTrigger(event: KeyboardEvent, trigger: TriggerBinding): b
   const key = normalizedKey(event.key);
   const triggerKey = normalizedKey(trigger.key);
 
+  if (isModifierKey(triggerKey)) {
+    if (!isModifierKey(key)) return false;
+    return (
+      (event.ctrlKey || key === "control") === (trigger.ctrl || triggerKey === "control") &&
+      (event.altKey || key === "alt") === (trigger.alt || triggerKey === "alt") &&
+      (event.metaKey || key === "meta") === (trigger.meta || triggerKey === "meta") &&
+      (event.shiftKey || key === "shift") === (trigger.shift || triggerKey === "shift")
+    );
+  }
+
   return (
     key === triggerKey &&
     (key === "control" ? false : event.ctrlKey) === trigger.ctrl &&
@@ -139,18 +178,27 @@ export function matchesTrigger(event: KeyboardEvent, trigger: TriggerBinding): b
   );
 }
 
-export function matchesMenuTrigger(event: KeyboardEvent, trigger: TriggerBinding): boolean {
-  if (event.repeat || !event.altKey) {
-    return false;
-  }
+export const sameTrigger = (left: TriggerBinding, right: TriggerBinding): boolean =>
+  isModifierTrigger(left) && isModifierTrigger(right)
+    ? modifierFlags(left) === modifierFlags(right)
+    : normalizedKey(left.key) === normalizedKey(right.key) &&
+      left.ctrl === right.ctrl &&
+      left.alt === right.alt &&
+      left.meta === right.meta &&
+      left.shift === right.shift;
 
-  const key = normalizedKey(event.key);
-  const triggerKey = normalizedKey(trigger.key);
+export const isModifierTrigger = (trigger: TriggerBinding): boolean =>
+  isModifierKey(normalizedKey(trigger.key));
 
-  return (
-    key === triggerKey &&
-    (key === "control" ? false : event.ctrlKey) === trigger.ctrl &&
-    (key === "meta" ? false : event.metaKey) === trigger.meta &&
-    (key === "shift" ? false : event.shiftKey) === trigger.shift
-  );
-}
+const isModifierKey = (key: string): boolean =>
+  key === "control" || key === "alt" || key === "meta" || key === "shift";
+
+const modifierFlags = (trigger: TriggerBinding): string => {
+  const key = normalizedKey(trigger.key);
+  return [
+    trigger.ctrl || key === "control" ? "control" : "",
+    trigger.alt || key === "alt" ? "alt" : "",
+    trigger.meta || key === "meta" ? "meta" : "",
+    trigger.shift || key === "shift" ? "shift" : "",
+  ].join("|");
+};

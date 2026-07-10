@@ -68,7 +68,7 @@
 
 **Risk:** A first translation attempt has insufficient detection confidence, but no result UI exists yet, leaving the user unable to select an explicit source language.
 
-**Evidence:** An unknown-source error uses the persistent extension announcer without adding hover page UI. Pressing the configured trigger on the same source opens the per-element language menu. `tests/dom/unknown-source-action.test.ts` verifies the first unknown-source response opens explicit language selection.
+**Evidence:** An unknown-source error uses the persistent extension announcer without adding hover page UI. Pressing the configured menu shortcut on the same source opens the per-element language menu. `tests/dom/unknown-source-action.test.ts` verifies the first unknown-source response opens explicit language selection.
 
 **Result:** Low-confidence automatic detection has an immediate explicit-language recovery path.
 

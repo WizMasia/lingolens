@@ -1,5 +1,20 @@
 import { LANGUAGE_CHOICES } from "../shared/languages";
-import { parseSettings, type Settings, type TriggerBinding } from "../shared/settings";
+import {
+  isModifierTrigger,
+  parseSettings,
+  type Settings,
+  sameTrigger,
+  type TriggerBinding,
+} from "../shared/settings";
+import {
+  conflictWarning,
+  defaultShortcuts,
+  modifierBinding,
+  type ShortcutBindings,
+  type ShortcutKind,
+  triggerFromEvent,
+  triggerLabel,
+} from "./shortcut-capture";
 
 const STORAGE_KEY = "settings";
 
@@ -11,6 +26,12 @@ export type OptionsDependencies = Readonly<{
 
 export type OptionsApp = Readonly<{ ready: Promise<void> }>;
 
+type TriggerControls = Readonly<{
+  capture: HTMLButtonElement;
+  value: HTMLOutputElement;
+  warning: HTMLParagraphElement;
+}>;
+
 export const createOptionsApp = (
   document: Document,
   dependencies: OptionsDependencies,
@@ -18,38 +39,87 @@ export const createOptionsApp = (
   const form = required(document, "settings-form", HTMLFormElement);
   const source = required(document, "source-language", HTMLSelectElement);
   const target = required(document, "target-language", HTMLSelectElement);
-  const capture = required(document, "trigger-capture", HTMLButtonElement);
-  const triggerValue = required(document, "trigger-value", HTMLOutputElement);
-  const warning = required(document, "trigger-warning", HTMLParagraphElement);
+  const controls: Record<ShortcutKind, TriggerControls> = {
+    translation: triggerControls(document, "trigger"),
+    menu: triggerControls(document, "menu-trigger"),
+  };
   const status = required(document, "save-status", HTMLParagraphElement);
-  let trigger: TriggerBinding = defaultTrigger();
-  let capturing = false;
+  let triggers = defaultShortcuts();
+  let capturing: ShortcutKind | null = null;
+  let modifierCandidate: TriggerBinding | null = null;
 
   populateLanguages(document, source, true);
   populateLanguages(document, target, true);
 
-  capture.addEventListener("click", () => {
-    capturing = true;
-    warning.textContent = "원하는 키 또는 키 조합을 누르세요.";
-    capture.focus();
-  });
-  capture.addEventListener("keydown", (event) => {
-    if (!capturing) return;
-    event.preventDefault();
-    const next = triggerFromEvent(event);
-    if (next === undefined) {
-      warning.textContent = "문자 키는 Ctrl, Alt, Shift 또는 Meta와 조합해 주세요.";
-      return;
-    }
-    trigger = next;
-    capturing = false;
-    warning.textContent = conflictWarning(next);
-    triggerValue.textContent = triggerLabel(next);
-  });
+  for (const kind of ["translation", "menu"] as const) {
+    const control = controls[kind];
+    control.capture.addEventListener("click", () => {
+      capturing = kind;
+      modifierCandidate = null;
+      control.warning.textContent = "원하는 키 또는 키 조합을 누르세요.";
+      control.capture.focus();
+    });
+    control.capture.addEventListener("keydown", (event) => {
+      if (capturing !== kind) return;
+      if (event.key === "Escape" || event.key === "Tab") {
+        if (event.key === "Escape") event.preventDefault();
+        control.value.textContent = triggerLabel(triggers[kind]);
+        control.warning.textContent = "단축키 변경을 취소했습니다.";
+        capturing = null;
+        modifierCandidate = null;
+        return;
+      }
+      event.preventDefault();
+      const next = triggerFromEvent(event);
+      if (next === undefined) {
+        control.warning.textContent = "문자 키는 Ctrl, Alt, Shift 또는 Meta와 조합해 주세요.";
+        return;
+      }
+      if (isModifierTrigger(next)) {
+        modifierCandidate = modifierBinding(event);
+        control.value.textContent = triggerLabel(modifierCandidate);
+        return;
+      }
+      finishCapture({
+        kind,
+        next,
+        current: triggers,
+        controls,
+        finish: (updated) => {
+          triggers = updated;
+          capturing = null;
+          modifierCandidate = null;
+        },
+        reject: () => {
+          capturing = null;
+          modifierCandidate = null;
+        },
+      });
+    });
+    control.capture.addEventListener("keyup", (event) => {
+      if (capturing !== kind || modifierCandidate === null) return;
+      event.preventDefault();
+      finishCapture({
+        kind,
+        next: modifierCandidate,
+        current: triggers,
+        controls,
+        finish: (updated) => {
+          triggers = updated;
+          capturing = null;
+          modifierCandidate = null;
+        },
+        reject: () => {
+          capturing = null;
+          modifierCandidate = null;
+        },
+      });
+    });
+  }
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void dependencies
-      .save(readSettings(form, source, target, trigger, dependencies.uiLanguage))
+      .save(readSettings(form, source, target, triggers, dependencies.uiLanguage))
       .then(
         () => {
           status.textContent = "설정을 저장했습니다.";
@@ -61,13 +131,14 @@ export const createOptionsApp = (
   });
 
   const ready = dependencies.load().then((settings) => {
-    trigger = settings.trigger;
+    triggers = { translation: settings.trigger, menu: settings.menuTrigger };
     for (const mode of form.querySelectorAll<HTMLInputElement>('input[name="display-mode"]')) {
       mode.checked = mode.value === settings.displayMode;
     }
     source.value = settings.source.kind === "auto" ? "auto" : settings.source.language;
     target.value = settings.target.kind === "browser" ? "browser" : settings.target.language;
-    triggerValue.textContent = triggerLabel(trigger);
+    controls.translation.value.textContent = triggerLabel(triggers.translation);
+    controls.menu.value.textContent = triggerLabel(triggers.menu);
   });
   return { ready };
 };
@@ -76,7 +147,7 @@ const readSettings = (
   form: HTMLFormElement,
   source: HTMLSelectElement,
   target: HTMLSelectElement,
-  trigger: TriggerBinding,
+  triggers: ShortcutBindings,
   uiLanguage: string,
 ): Settings => {
   const selectedMode = form.querySelector<HTMLInputElement>('input[name="display-mode"]:checked');
@@ -90,7 +161,8 @@ const readSettings = (
         target.value === "browser"
           ? { kind: "browser" }
           : { kind: "fixed", language: target.value },
-      trigger,
+      trigger: triggers.translation,
+      menuTrigger: triggers.menu,
     },
     uiLanguage,
   );
@@ -116,60 +188,41 @@ const createOption = (document: Document, label: string, value: string): HTMLOpt
   return option;
 };
 
-const triggerFromEvent = (event: KeyboardEvent): TriggerBinding | undefined => {
-  if (["Escape", "Tab", "Enter"].includes(event.key)) return undefined;
-  const modifierOnly = ["Control", "Alt", "Meta", "Shift"].includes(event.key);
-  if (
-    !modifierOnly &&
-    event.key.length === 1 &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.metaKey
-  ) {
-    return undefined;
+type FinishCaptureOptions = Readonly<{
+  kind: ShortcutKind;
+  next: TriggerBinding;
+  current: ShortcutBindings;
+  controls: Record<ShortcutKind, TriggerControls>;
+  finish(updated: ShortcutBindings): void;
+  reject(): void;
+}>;
+
+const finishCapture = ({
+  kind,
+  next,
+  current,
+  controls,
+  finish,
+  reject,
+}: FinishCaptureOptions): void => {
+  const other = kind === "translation" ? current.menu : current.translation;
+  if (sameTrigger(next, other)) {
+    controls[kind].warning.textContent = "두 단축키는 같을 수 없습니다.";
+    controls[kind].value.textContent = triggerLabel(current[kind]);
+    reject();
+    return;
   }
-  return {
-    key: event.key,
-    ctrl: event.key === "Control" ? false : event.ctrlKey,
-    alt: event.key === "Alt" ? false : event.altKey,
-    meta: event.key === "Meta" ? false : event.metaKey,
-    shift: event.key === "Shift" ? false : event.shiftKey,
-  };
+  const updated = { ...current, [kind]: next };
+  const label = triggerLabel(next);
+  controls[kind].warning.textContent = conflictWarning(next) || `${label}로 설정했습니다.`;
+  controls[kind].value.textContent = label;
+  finish(updated);
 };
 
-const triggerLabel = (trigger: TriggerBinding): string => {
-  const parts = [
-    trigger.ctrl ? "Ctrl" : "",
-    trigger.alt ? "Alt" : "",
-    trigger.shift ? "Shift" : "",
-    trigger.meta ? "Meta" : "",
-    modifierLabel(trigger.key),
-  ].filter((part) => part.length > 0);
-  return [...new Set(parts)].join(" + ");
-};
-
-const modifierLabel = (key: string): string => {
-  switch (key) {
-    case "Control":
-      return "Ctrl";
-    case " ":
-      return "Space";
-    default:
-      return key.length === 1 ? key.toLocaleUpperCase() : key;
-  }
-};
-
-const conflictWarning = (trigger: TriggerBinding): string =>
-  trigger.ctrl && trigger.key.toLocaleLowerCase() === "l"
-    ? "Chrome 주소창 단축키와 충돌할 수 있습니다."
-    : "";
-
-const defaultTrigger = (): TriggerBinding => ({
-  key: "Control",
-  ctrl: false,
-  alt: false,
-  meta: false,
-  shift: false,
+const triggerControls = (document: Document, prefix: string): TriggerControls => ({
+  capture: required(document, `${prefix}-capture`, HTMLButtonElement),
+  value: required(document, `${prefix}-value`, HTMLOutputElement),
+  warning: required(document, `${prefix}-warning`, HTMLParagraphElement),
 });
 
 const required = <ElementType extends Element>(

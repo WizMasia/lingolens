@@ -6,10 +6,12 @@ Make the configured trigger key toggle translation on the current element withou
 
 ## Interaction
 
-- The configured trigger (default `Ctrl`) translates an untranslated target.
+- The configured translation trigger (default `Ctrl`) translates an untranslated target.
 - The same trigger on a target with a successful translation restores that target immediately. It must not open a language menu.
-- `Alt` plus the configured trigger opens per-element language selection for an existing translation or an error record. This supports explicit source/target selection after an automatic-detection failure.
-- `Alt` is reserved for this menu action, so a saved primary trigger containing Alt falls back to the default Control trigger.
+- A separately configured menu trigger (default `Ctrl + Shift`) opens per-element language selection for an existing translation or an error record. This supports explicit source/target selection after an automatic-detection failure.
+- Existing stored `trigger` values remain the translation trigger. Missing `menuTrigger` values migrate to `Ctrl + Shift`.
+- The two triggers cannot be identical. Invalid or colliding menu settings fall back to `Ctrl + Shift`, or `Ctrl + Shift + L` when that would still collide.
+- Modifier-only chords are order-independent. A single-modifier translation trigger resolves on key release so adding another modifier does not fire translation first.
 - The existing inline-card language action opens the same language selection UI.
 
 ## Floating Menu
@@ -20,14 +22,14 @@ The menu focuses its source-language selector when opened and shows the detected
 
 ## Implementation Boundaries
 
-- `src/content/index.ts` classifies the primary trigger versus its Alt-modified variant.
+- `src/content/index.ts` classifies the independent translation and menu triggers and manages pending single-modifier translation activation.
 - `src/content/controller.ts` restores successful translations on primary-trigger repeat and retains language-menu handling for explicit menu requests and error records.
 - `src/content/element-menu.ts` owns fixed positioning, outside-dismissal, focus restoration, and Shadow DOM isolation.
 - Existing inline and hover rendering remain unchanged except that no language menu is inserted beside an element.
 
 ## Verification
 
-- Content-entry tests distinguish primary trigger toggle from Alt-modified language-menu activation.
+- Content-entry tests distinguish the translation trigger toggle from the independently configured language-menu trigger.
 - Controller tests prove a repeated primary trigger restores the record without opening a menu.
 - Menu tests prove the host is body-level, fixed-positioned, closes on outside click/Escape, and leaves no page-flow sibling.
-- Chrome acceptance confirms Ctrl translates/restores, Alt+Ctrl opens a floating menu, and the source has no inserted sibling menu.
+- Chrome acceptance confirms Ctrl translates/restores, Ctrl+Shift opens a floating menu in either modifier order, and the source has no inserted sibling menu.

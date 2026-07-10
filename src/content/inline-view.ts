@@ -16,8 +16,60 @@ type InlineEntry = Readonly<{
   unregisterRestorer: () => void;
 }>;
 
+type ReadingStyleProperty =
+  | "fontFamily"
+  | "fontSize"
+  | "fontWeight"
+  | "fontStyle"
+  | "lineHeight"
+  | "letterSpacing"
+  | "wordSpacing"
+  | "textAlign"
+  | "textTransform"
+  | "textIndent"
+  | "writingMode";
+
+type StyleProperty = Readonly<{ css: string; key: ReadingStyleProperty }>;
+
 const UI_ATTRIBUTE = "data-local-translator-ui";
 const STALE_NOTICE = "원문이 변경되었습니다. 다시 번역해 주세요.";
+
+const READING_STYLE_PROPERTIES: readonly StyleProperty[] = [
+  { css: "font-family", key: "fontFamily" },
+  { css: "font-size", key: "fontSize" },
+  { css: "font-weight", key: "fontWeight" },
+  { css: "font-style", key: "fontStyle" },
+  { css: "line-height", key: "lineHeight" },
+  { css: "letter-spacing", key: "letterSpacing" },
+  { css: "word-spacing", key: "wordSpacing" },
+  { css: "text-align", key: "textAlign" },
+  { css: "text-transform", key: "textTransform" },
+  { css: "text-indent", key: "textIndent" },
+  { css: "writing-mode", key: "writingMode" },
+];
+
+const OWNED_TOKENS: readonly Readonly<{ name: string; value: string }>[] = [
+  { name: "--lt-color-ink", value: "#17201b" },
+  { name: "--lt-color-paper", value: "#f7f4ec" },
+  { name: "--lt-color-moss", value: "#2f6d4f" },
+  { name: "--lt-color-danger", value: "#a33a32" },
+  { name: "--lt-color-border", value: "rgb(23 32 27 / 12%)" },
+  {
+    name: "--lt-font-control",
+    value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  { name: "--lt-font-translation", value: 'ui-serif, Georgia, Cambria, "Times New Roman", serif' },
+  { name: "--lt-font-size-caption", value: "0.75rem" },
+  { name: "--lt-font-size-body", value: "0.875rem" },
+  { name: "--lt-line-height-control", value: "1.4" },
+  { name: "--lt-line-height-reading", value: "1.6" },
+  { name: "--lt-space-2", value: "8px" },
+  { name: "--lt-space-3", value: "12px" },
+  { name: "--lt-radius", value: "10px" },
+  { name: "--lt-border", value: "1px solid rgb(23 32 27 / 12%)" },
+  { name: "--lt-focus-ring", value: "0 0 0 2px #2f6d4f" },
+  { name: "--lt-target-min", value: "44px" },
+];
 
 const INLINE_STYLES = `
   :host {
@@ -86,6 +138,7 @@ export const createInlineView = (
     entry.translation.textContent = success.text;
     entry.meta.textContent = `${success.sourceLanguage} → ${success.targetLanguage}`;
     entry.status.textContent = "";
+    applySourceReadingStyle(record.source, entry.host, entry.translation);
     entry.host.lang = success.targetLanguage;
     entry.host.dir = languageDirection(success.targetLanguage);
     entry.translation.lang = success.targetLanguage;
@@ -146,6 +199,7 @@ const createEntry = (
 ): InlineEntry => {
   const host = document.createElement("div");
   host.setAttribute(UI_ATTRIBUTE, "inline");
+  applyOwnedTokens(host);
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = INLINE_STYLES;
@@ -168,6 +222,27 @@ const createEntry = (
   shadow.append(style, surface);
   const unregisterRestorer = record.registerRestorer(onLifecycle);
   return { host, translation, meta, status, button, onAction, unregisterRestorer };
+};
+
+const applyOwnedTokens = (host: HTMLElement): void => {
+  for (const token of OWNED_TOKENS) {
+    host.style.setProperty(token.name, token.value, "important");
+  }
+};
+
+const applySourceReadingStyle = (
+  source: HTMLElement,
+  host: HTMLElement,
+  translation: HTMLElement,
+): void => {
+  const sourceStyle = source.ownerDocument.defaultView?.getComputedStyle(source);
+  if (sourceStyle === undefined) return;
+  for (const property of READING_STYLE_PROPERTIES) {
+    translation.style.setProperty(property.css, sourceStyle[property.key]);
+  }
+  host.style.width = sourceStyle.width;
+  host.style.marginBlockStart = sourceStyle.marginBlockStart || sourceStyle.marginTop;
+  host.style.marginBlockEnd = sourceStyle.marginBlockEnd || sourceStyle.marginBottom;
 };
 
 const languageDirection = (language: string): "ltr" | "rtl" => {

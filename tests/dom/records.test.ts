@@ -13,6 +13,15 @@ Object.defineProperty(globalThis, "document", {
 Object.defineProperties(globalThis, {
   Element: { configurable: true, value: testWindow.Element },
   Event: { configurable: true, value: testWindow.Event },
+  HTMLElement: { configurable: true, value: testWindow.HTMLElement },
+});
+Object.defineProperty(testWindow.HTMLElement.prototype, "getClientRects", {
+  configurable: true,
+  value: () => [new testWindow.DOMRect(0, 0, 100, 20)],
+});
+Object.defineProperty(testWindow, "getComputedStyle", {
+  configurable: true,
+  value: () => ({ display: "block", opacity: "1", visibility: "visible" }),
 });
 const shadowRoots = new WeakMap<Element, ShadowRoot>();
 const attachShadow = Element.prototype.attachShadow;

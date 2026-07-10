@@ -116,8 +116,15 @@ export const createInlineView = (
         return;
       }
       render(record);
-      const entry = entries.get(record);
-      if (entry === undefined) return;
+      let entry = entries.get(record);
+      if (entry === undefined) {
+        entry = createEntry(document, record, actions, (reason) => {
+          if (reason !== "inspect") restore(record);
+        });
+        entry.host.setAttribute(UI_ATTRIBUTE, "inline-error");
+        entries.set(record, entry);
+        record.source.after(entry.host);
+      }
       entry.status.textContent = message;
     },
     restore,

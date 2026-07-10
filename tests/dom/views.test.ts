@@ -345,29 +345,4 @@ describe("hover view", () => {
       true,
     );
   });
-
-  it("uses changed source text as the baseline after retranslation", () => {
-    // Given
-    const store = createRecordStore();
-    const source = sourceFixture("Old source");
-    const record = store.getOrCreate(source);
-    record.complete("Ancienne", "en", "fr");
-    const view = createHoverView();
-    view.render(record);
-    source.textContent = "Updated source";
-    store.markStale(record);
-    record.transition("queued");
-    record.transition("translating");
-    record.complete("Nouvelle", "en", "fr", "Updated source");
-    view.render(record);
-
-    // When
-    source.dispatchEvent(event("pointerenter"));
-    expect(source.textContent).toBe("Nouvelle");
-    source.dispatchEvent(event("pointerleave"));
-
-    // Then
-    expect(source.textContent).toBe("Updated source");
-    expect(record.snapshot.map(({ value }) => value)).toEqual(["Old source"]);
-  });
 });

@@ -1,11 +1,5 @@
 import type { ElementRecord, RecordLifecycle, TextSnapshot, TranslationView } from "./records";
 
-export type HoverView = TranslationView;
-
-export type HoverViewActions = Readonly<{
-  onAction(record: ElementRecord): void;
-}>;
-
 type HoverEntry = {
   readonly record: ElementRecord;
   readonly actionHost: HTMLElement;
@@ -45,8 +39,8 @@ const HOVER_STYLES = `
 `;
 
 export const createHoverView = (
-  actions: HoverViewActions = { onAction: () => undefined },
-): HoverView => {
+  actions: Readonly<{ onAction(record: ElementRecord): void }> = { onAction: () => undefined },
+): TranslationView => {
   const entries = new Map<ElementRecord, HoverEntry>();
 
   const restore = (record: ElementRecord): void => {
@@ -64,21 +58,26 @@ export const createHoverView = (
   const render = (record: ElementRecord): void => {
     restore(record);
     if (record.lastSuccess === null || record.phase === "stale") return;
+    mount(record);
+  };
+
+  const mount = (record: ElementRecord): HoverEntry => {
     const entry = createEntry(record, actions, (reason) =>
       reason === "inspect" ? restoreText(entry) : restore(record),
     );
     entries.set(record, entry);
     addListeners(entry);
     record.source.after(entry.actionHost);
+    return entry;
   };
 
   return {
     render,
     markStale() {},
     setError(record, message) {
-      if (!entries.has(record)) render(record);
-      const entry = entries.get(record);
-      if (entry !== undefined) entry.status.textContent = message;
+      const entry = entries.get(record) ?? mount(record);
+      entry.status.textContent = message;
+      entry.actionHost.hidden = false;
     },
     restore,
     destroy() {
@@ -89,7 +88,7 @@ export const createHoverView = (
 
 const createEntry = (
   record: ElementRecord,
-  actions: HoverViewActions,
+  actions: Readonly<{ onAction(record: ElementRecord): void }>,
   onLifecycle: (reason: RecordLifecycle) => void,
 ): HoverEntry => {
   const { host, meta, status, button } = createActionSurface(record.source.ownerDocument);

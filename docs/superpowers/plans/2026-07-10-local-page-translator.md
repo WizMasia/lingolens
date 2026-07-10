@@ -106,7 +106,9 @@ await build({
 await Promise.all([
   cp("src/manifest.json", "dist/manifest.json"),
   cp("src/popup/popup.html", "dist/popup.html"),
+  cp("src/popup/popup.css", "dist/popup.css"),
   cp("src/options/options.html", "dist/options.html"),
+  cp("src/options/options.css", "dist/options.css"),
   cp("src/styles", "dist/styles", { recursive: true }),
   cp("src/icons", "dist/icons", { recursive: true }),
 ]);
@@ -296,7 +298,7 @@ Expected: FAIL because the target module is absent.
 
 - [ ] **Step 3: Implement conservative scanning**
 
-Use a `TreeWalker` over elements. Reject disconnected nodes; tags `SCRIPT`, `STYLE`, `NOSCRIPT`, `TEMPLATE`, `CODE`, `PRE`, `TEXTAREA`, `INPUT`, `SELECT`, `OPTION`, `BUTTON`; `[contenteditable]:not([contenteditable="false"])`; `[aria-hidden="true"]`; `[hidden]`; `[data-local-translator-ui]`; zero-sized elements from `getClientRects()` outside tests; and text that is empty, punctuation-only, or numeric-only. Prefer the deepest eligible block/leaf and do not return an ancestor when an eligible descendant represents its meaningful text. Traverse open shadow roots recursively.
+Use a `TreeWalker` over elements. Reject disconnected nodes; tags `SCRIPT`, `STYLE`, `NOSCRIPT`, `TEMPLATE`, `CODE`, `PRE`, `TEXTAREA`, `INPUT`, `SELECT`, `OPTION`, `BUTTON`; `[contenteditable]:not([contenteditable="false"])`; `[aria-hidden="true"]`; `[hidden]`; `[data-local-translator-ui]`; zero-sized elements from `getClientRects()`; and text that is empty, punctuation-only, or numeric-only. Prefer the deepest eligible block/leaf and do not return an ancestor when an eligible descendant represents its meaningful text. Traverse open shadow roots recursively. In `tests/dom/targets.test.ts`, stub `HTMLElement.prototype.getClientRects` to return one `DOMRect` in `beforeEach` and restore it in `afterEach`; add a dedicated test that overrides one element with an empty rect list and verifies exclusion. Production code never branches on test-environment detection.
 
 `collectSourceText` joins non-empty descendant text nodes with normalized single spaces without mutating DOM. `targetFromSelection` rejects collapsed selections and maps a text anchor to its parent element before calling `nearestTarget`.
 
@@ -489,7 +491,7 @@ git commit -m "feat: render reversible translations"
 
 **Interfaces:**
 - Consumes: settings, target discovery, engine, store, views.
-- Produces: `TranslationController` with `setHovered`, `translateTarget`, `openElementMenu`, `restoreElement`, `applySettings`, `destroy`; `ElementLanguageChoice` and `ElementMenu`.
+- Produces: `TranslationController` with `setHovered(element: HTMLElement | undefined): void`, `translateTarget(element: HTMLElement): Promise<void>`, `retranslate(element: HTMLElement, choice: ElementLanguageChoice): Promise<void>`, `openElementMenu(element: HTMLElement): Promise<void>`, `restoreElement(element: HTMLElement): void`, `applySettings(settings: Settings): void`, and `destroy(): void`; `ElementLanguageChoice` and `ElementMenu`.
 
 - [ ] **Step 1: Write failing targeted-translation tests**
 
@@ -553,7 +555,7 @@ git commit -m "feat: add element retranslation controls"
 - Create: `tests/dom/stale-content.test.ts`
 
 **Interfaces:**
-- Produces: `runPageJob(targets, worker, onProgress, signal, concurrency = 3): Promise<PageJobSummary>`; controller methods `translatePage`, `restorePage`, `getState`; progress `TabState` messages.
+- Produces: `runPageJob(targets, worker, onProgress, signal, concurrency = 3): Promise<PageJobSummary>`; controller methods `translatePage(): Promise<PageJobSummary>`, `restorePage(): void`, and `getState(): TabState`; progress `TabState` messages.
 
 ```ts
 export type PageJobOutcome = "translated" | "skipped" | "failed";
@@ -680,7 +682,7 @@ Generate a simple original icon set: paper-colored rounded square, moss border, 
 
 Run: `bun test tests/unit/background.test.ts tests/dom/popup.test.ts tests/dom/options.test.ts && bun run check && bun run build`
 
-Expected: tests and checks pass; `dist/manifest.json`, four JS bundles, two HTML files, styles, and four icons exist.
+Expected: tests and checks pass; `dist/manifest.json`, four JS bundles, two HTML files, `popup.css`, `options.css`, shared styles, and four icons exist.
 
 ```bash
 git add src tests/unit/background.test.ts tests/dom/popup.test.ts tests/dom/options.test.ts

@@ -1,3 +1,4 @@
+import { MAX_NANO_CONTEXT_LENGTH, MAX_NANO_TEXT_LENGTH } from "../shared/protocol";
 import { type AiAdapter, type AiTranslator, TranslationError } from "./ai-engine";
 import type { NanoLanguageDecision } from "./nano-language-detector";
 
@@ -82,7 +83,12 @@ export const createChromiumAiAdapter = (
           async detectWithNano(text: string, context: string): Promise<NanoLanguageDecision> {
             if (options.isNanoEnabled?.() === false) return { kind: "unavailable" };
             try {
-              return nanoDecision(await detectWithNano(text, context));
+              return nanoDecision(
+                await detectWithNano(
+                  text.slice(0, MAX_NANO_TEXT_LENGTH),
+                  context.slice(0, MAX_NANO_CONTEXT_LENGTH),
+                ),
+              );
             } catch {
               return { kind: "unavailable" };
             }

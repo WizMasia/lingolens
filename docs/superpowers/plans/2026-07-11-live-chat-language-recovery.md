@@ -17,7 +17,7 @@
 - Accept Nano output only when JSON parsing, language normalization, confidence `>= 0.8`, and Translator pair availability all pass.
 - Keep all author-language state in memory for one content-controller lifetime; clear it through page restore, pagehide, and tab navigation.
 - Preserve hover-only rendering for live chat and keep `data-local-translator-ui="inline"` absent from its frame.
-- Do not claim support for romanized Hindi, Urdu, or any Prompt API input language Chrome does not document; manual per-author selection remains the recovery path.
+- Do not claim support for romanized Hindi or any Prompt API input language Chrome does not document; manual per-author selection remains the recovery path only for Chrome Translator-supported languages. Romanized Urdu remains unsupported while no Urdu pair is available.
 - New or touched TypeScript source files must remain at or below 250 pure lines.
 
 ---

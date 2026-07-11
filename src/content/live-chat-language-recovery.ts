@@ -1,7 +1,7 @@
 import type { Settings } from "../shared/settings";
 import { createLiveChatLanguageMemory } from "./live-chat-language-memory";
 import type { RecordStore } from "./records";
-import type { YouTubeLiveChatSession } from "./youtube-live-chat";
+import type { LiveChatSourcePreference, YouTubeLiveChatSession } from "./youtube-live-chat";
 
 type LanguageChoice = Readonly<{
   source: "auto" | string;
@@ -9,7 +9,7 @@ type LanguageChoice = Readonly<{
 }>;
 
 export type LiveChatLanguageRecovery = Readonly<{
-  preference(source: HTMLElement, fallback: Settings["source"]): Settings["source"];
+  preference(source: HTMLElement, fallback: Settings["source"]): LiveChatSourcePreference;
   remember(source: HTMLElement, choice: LanguageChoice): void;
   restore(source: HTMLElement): void;
   destroy(): void;
@@ -27,12 +27,13 @@ export const createLiveChatLanguageRecovery = (
       const override = store.getOrCreate(source).languageOverride;
       if (override !== null) {
         return override.source === "auto"
-          ? { kind: "auto" }
+          ? { kind: "auto", nanoAllowed: true }
           : { kind: "fixed", language: override.source };
       }
       const language = authorId(source);
       const remembered = language === undefined ? undefined : languages.get(language);
-      return remembered === undefined ? fallback : { kind: "fixed", language: remembered };
+      if (remembered !== undefined) return { kind: "fixed", language: remembered };
+      return fallback.kind === "auto" ? { kind: "auto", nanoAllowed: true } : fallback;
     },
     remember(source, choice) {
       const language = authorId(source);

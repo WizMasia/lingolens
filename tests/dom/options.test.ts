@@ -9,6 +9,7 @@ Object.defineProperties(globalThis, {
   Event: { configurable: true, value: testWindow.Event },
   HTMLButtonElement: { configurable: true, value: testWindow.HTMLButtonElement },
   HTMLFormElement: { configurable: true, value: testWindow.HTMLFormElement },
+  HTMLInputElement: { configurable: true, value: testWindow.HTMLInputElement },
   HTMLOutputElement: { configurable: true, value: testWindow.HTMLOutputElement },
   HTMLParagraphElement: { configurable: true, value: testWindow.HTMLParagraphElement },
   HTMLSelectElement: { configurable: true, value: testWindow.HTMLSelectElement },
@@ -81,11 +82,13 @@ describe("options", () => {
   it("reports unavailable Nano preparation without changing the setting", async () => {
     // Given
     const prepareNano = vi.fn().mockResolvedValue("unavailable");
+    const authorizeNano = vi.fn().mockResolvedValue(undefined);
     const app = createOptionsApp(document, {
       load: async () => DEFAULTS,
       save: async () => undefined,
       uiLanguage: "ko",
       prepareNano,
+      authorizeNano,
     });
     await app.ready;
 
@@ -95,7 +98,25 @@ describe("options", () => {
 
     // Then
     expect(prepareNano).toHaveBeenCalledOnce();
+    expect(authorizeNano).not.toHaveBeenCalled();
     expect(document.querySelector("#nano-status")?.textContent).toContain("사용할 수 없습니다");
+  });
+
+  it("authorizes this extension session only after an explicit successful preparation", async () => {
+    const authorizeNano = vi.fn().mockResolvedValue(undefined);
+    const app = createOptionsApp(document, {
+      load: async () => DEFAULTS,
+      save: async () => undefined,
+      uiLanguage: "ko",
+      prepareNano: async () => "ready",
+      authorizeNano,
+    });
+    await app.ready;
+
+    document.querySelector<HTMLButtonElement>("#prepare-live-chat-nano")?.click();
+    await Promise.resolve();
+
+    expect(authorizeNano).toHaveBeenCalledOnce();
   });
 
   it("prepares Nano only after a button click and reports progress", async () => {
@@ -127,6 +148,7 @@ describe("options", () => {
     expect(prepareNano).toHaveBeenCalledOnce();
     expect(document.querySelector("#nano-status")?.textContent).toBe("로컬 모델 준비 중: 56%");
     completePreparation();
+    await Promise.resolve();
     await Promise.resolve();
     expect(document.querySelector("#nano-status")?.textContent).toBe("준비됨");
   });

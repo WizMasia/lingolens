@@ -48,9 +48,11 @@ Only YouTube `live_chat` frames are handled. The extension does not claim suppor
 
 ### Experimental live-chat language assistance
 
-Experimental live-chat language assistance is opt-in and disabled by default. It is an on-device classifier, not a translator: it can help choose a likely source language for eligible normal messages, while LingoLens still uses Chrome's translation model for translation. Enable **Gemini Nano language assistance** in Settings, save the setting, and explicitly click Prepare before it can be used; Chrome may download its Chrome-managed model during preparation.
+Experimental live-chat language assistance is opt-in and disabled by default. It is an on-device classifier, not a translator: it can help choose a likely source language for eligible normal YouTube Live Chat messages, while LingoLens still uses Chrome's translation model for translation. Enable **Gemini Nano language assistance** in Settings, save the setting, and explicitly click Prepare before it can be used in the current extension session; Chrome may download its Chrome-managed model during preparation.
 
-Nano prompts stay inside Chrome. The assistance is experimental, can be unavailable or inaccurate, and does not guarantee romanized Hindi or Urdu support. Use the configured language-menu shortcut to choose Hindi or another source language for an author when automatic assistance is uncertain.
+The preparation authorization is intentionally session-only. After the extension worker restarts, click Prepare again before Nano assistance can run; LingoLens never starts a new model download automatically.
+
+Nano prompts stay inside Chrome. The assistance is experimental, can be unavailable or inaccurate, and does not guarantee romanized Hindi. Use the configured language-menu shortcut to choose Hindi or another Chrome Translator-supported source language for an author when automatic assistance is uncertain. Romanized Urdu cannot be recovered while Chrome Translator has no supported Urdu pair.
 
 ## Model and language-pair limits
 

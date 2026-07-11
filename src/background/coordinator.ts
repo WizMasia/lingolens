@@ -53,6 +53,7 @@ export const createBackgroundCoordinator = (
   let pageActionQueue: Promise<void> = Promise.resolve();
   const tabLifecycleEvents = new Map<number, number>();
   let lifecycleEvent = 0;
+  let nanoSessionAuthorized = false;
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
   const isTopLiveChat = (tab: ActiveTab): boolean =>
     hasTopLiveChat(tab.id) || isYouTubeLiveChatUrl(tab.url ?? "");
@@ -83,8 +84,12 @@ export const createBackgroundCoordinator = (
   const restorePageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
     liveChatIntent.disable(tab.id);
     await dependencies.liveChatState.setEnabled(tab.id, false);
-    if (!isTopLiveChat(tab)) await dependencies.sendToTop(tab.id, message);
-    dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
+    try {
+      if (!isTopLiveChat(tab)) await dependencies.sendToTop(tab.id, message);
+    } finally {
+      dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
+      void dependencies.nanoBridge?.close();
+    }
   };
   const clearLiveChatIntent = (tabId: number, forget: boolean): void => {
     lifecycleEvent += 1;
@@ -95,6 +100,7 @@ export const createBackgroundCoordinator = (
       await dependencies.liveChatState.setEnabled(tabId, false);
       if (forget) liveChatIntent.forgetIfCurrent(tabId, generation);
     });
+    void dependencies.nanoBridge?.close();
   };
   return {
     async receive(value, senderTabId, senderFrameId) {
@@ -123,7 +129,11 @@ export const createBackgroundCoordinator = (
         case "settings-changed":
           dependencies.broadcastSettings();
           return undefined;
+        case "nano-session-authorized":
+          nanoSessionAuthorized = true;
+          return undefined;
         case "detect-nano-source":
+          if (!nanoSessionAuthorized) return { kind: "unavailable" };
           return (
             (await dependencies.nanoBridge?.detect({
               text: message.text,
@@ -184,7 +194,6 @@ export const createBackgroundCoordinator = (
     },
     removeTab(tabId) {
       clearLiveChatIntent(tabId, true);
-      void dependencies.nanoBridge?.close();
     },
     settingsChanged() {
       dependencies.broadcastSettings();

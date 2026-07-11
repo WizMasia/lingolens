@@ -1,7 +1,7 @@
 import type { Settings } from "../shared/settings";
 import { createLiveChatLanguageRecovery } from "./live-chat-language-recovery";
 import type { ElementRecord, RecordStore } from "./records";
-import { createYouTubeLiveChatSession } from "./youtube-live-chat";
+import { createYouTubeLiveChatSession, type LiveChatSourcePreference } from "./youtube-live-chat";
 
 type LanguageChoice = Readonly<{
   source: "auto" | string;
@@ -23,7 +23,7 @@ export type LiveChatSessionControllerOptions = Readonly<{
   settings(): Settings;
   translate(
     source: HTMLElement,
-    preference: Settings["source"],
+    preference: LiveChatSourcePreference,
     signal: AbortSignal,
   ): Promise<void>;
   syncRecords(): void;
@@ -33,25 +33,40 @@ export const createLiveChatSessionController = (
   options: LiveChatSessionControllerOptions,
 ): LiveChatSessionController => {
   const records = new WeakSet<ElementRecord>();
+  const detections = new Map<string, LiveChatSourcePreference["knownDetection"]>();
+  let languages: ReturnType<typeof createLiveChatLanguageRecovery>;
   const session = createYouTubeLiveChatSession({
     document: options.document,
-    async translate(source, signal) {
-      records.add(options.store.getOrCreate(source));
+    capturePreference(source) {
+      return languages.preference(source, options.settings().source);
+    },
+    async translate(source, signal, message) {
+      const record = options.store.getOrCreate(source);
+      records.add(record);
+      const knownDetection = detections.get(message.text);
+      const preference =
+        knownDetection === undefined || message.preference.kind === "fixed"
+          ? message.preference
+          : { ...message.preference, knownDetection };
       try {
-        await options.translate(
-          source,
-          languages.preference(source, options.settings().source),
-          signal,
-        );
+        await options.translate(source, preference, signal);
+        if (record.detection.kind === "detected" && record.detection.provenance !== "user") {
+          detections.set(message.text, {
+            kind: "detected",
+            language: record.detection.language,
+            provenance: record.detection.provenance,
+          });
+        }
       } finally {
         options.syncRecords();
       }
     },
   });
-  const languages = createLiveChatLanguageRecovery(session, options.store);
+  languages = createLiveChatLanguageRecovery(session, options.store);
   const stop = (): void => {
     session.stop();
     languages.destroy();
+    detections.clear();
   };
 
   return {
@@ -60,8 +75,9 @@ export const createLiveChatSessionController = (
     destroy() {
       session.destroy();
       languages.destroy();
+      detections.clear();
     },
-    has: (record) => records.has(record),
+    has: (record) => records.has(record) || session.isMessage(record.source),
     remember: languages.remember,
     restore: languages.restore,
   };

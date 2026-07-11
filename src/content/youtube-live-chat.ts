@@ -1,3 +1,5 @@
+import type { SourcePreference } from "../shared/settings";
+import type { AutomaticDetectionEvidence } from "./source-detection";
 import { collectSourceText } from "./targets";
 
 const ITEM_LIST_SELECTOR = "yt-live-chat-item-list-renderer #items";
@@ -12,18 +14,26 @@ export type YouTubeLiveChatSession = Readonly<{
   isMessage(source: HTMLElement): boolean;
 }>;
 
-export type LiveChatMessage = Readonly<{ source: HTMLElement; authorId?: string }>;
+export type LiveChatSourcePreference = SourcePreference &
+  Readonly<{
+    knownDetection?: AutomaticDetectionEvidence;
+    nanoAllowed?: true;
+  }>;
+
+export type LiveChatMessage = Readonly<{
+  source: HTMLElement;
+  text: string;
+  preference: LiveChatSourcePreference;
+  authorId?: string;
+}>;
 
 export type YouTubeLiveChatDependencies = Readonly<{
   document: Document;
-  translate(source: HTMLElement, signal: AbortSignal): Promise<void>;
+  capturePreference?(source: HTMLElement): LiveChatSourcePreference;
+  translate(source: HTMLElement, signal: AbortSignal, message: LiveChatMessage): Promise<void>;
 }>;
 
-type QueuedMessage = LiveChatMessage &
-  Readonly<{
-    text: string;
-    fresh: boolean;
-  }>;
+type QueuedMessage = LiveChatMessage & Readonly<{ fresh: boolean }>;
 
 export const isYouTubeLiveChatDocument = (
   location: Pick<Location, "hostname" | "pathname">,
@@ -52,7 +62,15 @@ export const createYouTubeLiveChatSession = (
       if (!active || text.length === 0 || queuedText.get(source) === text) return [];
       queuedText.set(source, text);
       const authorId = authorIdFor(source);
-      return [{ source, text, fresh, ...(authorId === undefined ? {} : { authorId }) }];
+      return [
+        {
+          source,
+          text,
+          fresh,
+          preference: dependencies.capturePreference?.(source) ?? { kind: "auto" },
+          ...(authorId === undefined ? {} : { authorId }),
+        },
+      ];
     });
     if (entries.length === 0) return;
     queue = fresh ? [...entries, ...queue] : [...queue, ...entries];
@@ -104,7 +122,7 @@ export const createYouTubeLiveChatSession = (
       }
       processQueue();
     };
-    void dependencies.translate(entry.source, controller.signal).then(complete, complete);
+    void dependencies.translate(entry.source, controller.signal, entry).then(complete, complete);
   };
 
   const observeItemList = (list: HTMLElement): void => {

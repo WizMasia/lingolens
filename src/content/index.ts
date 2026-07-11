@@ -101,6 +101,7 @@ export const createContentApp = (
           dependencies.controller.applySettings(next);
         });
       case "tab-state":
+      case "nano-session-authorized":
       case "detect-nano-source":
       case "offscreen-nano-detect":
         return undefined;

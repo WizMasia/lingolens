@@ -48,6 +48,7 @@ type AutomaticSource = Extract<SourcePreference, { readonly kind: "auto" }> &
     languageHint?: string;
     context?: string;
     knownDetection?: AutomaticDetectionEvidence;
+    nanoAllowed?: true;
   }>;
 
 export type TranslationRequest = Readonly<{
@@ -204,6 +205,7 @@ const requestKey = (request: TranslationRequest): string => {
           request.source.languageHint ?? "",
           request.source.context ?? "",
           request.source.knownDetection ?? null,
+          request.source.nanoAllowed === true,
         ];
   return JSON.stringify([source, request.target, request.text]);
 };

@@ -207,7 +207,7 @@ describe("source detection", () => {
     });
   });
 
-  it("uses Nano only after deterministic detection is unavailable", async () => {
+  it("uses Nano only for an opted-in live-chat request after deterministic detection is unavailable", async () => {
     // Given
     const detectWithNano = vi.fn().mockResolvedValue({
       kind: "detected",
@@ -217,7 +217,11 @@ describe("source detection", () => {
     const detector = createSourceDetector(makeAdapter({ detectWithNano }));
 
     // When
-    const result = detector({ text: "1234", source: { kind: "auto" } });
+    const result = detector({
+      text: "1234",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
 
     // Then
     await expect(result).resolves.toEqual({
@@ -226,6 +230,40 @@ describe("source detection", () => {
       provenance: "gemini-nano",
     });
     expect(detectWithNano).toHaveBeenCalledWith("1234", "1234");
+  });
+
+  it("does not send ordinary page text to Nano", async () => {
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.9,
+    });
+    const detector = createSourceDetector(makeAdapter({ detectWithNano }));
+
+    await expect(
+      detector({ text: "1234", source: { kind: "auto" }, target: "ko" }),
+    ).resolves.toEqual({
+      kind: "needs-confirmation",
+    });
+    expect(detectWithNano).not.toHaveBeenCalled();
+  });
+
+  it("rejects Nano when its Translator pair is unavailable", async () => {
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.9,
+    });
+    const adapter: AiAdapter = {
+      ...makeAdapter({ detectWithNano }),
+      availability: vi.fn().mockResolvedValue("unavailable"),
+    };
+    const detector = createSourceDetector(adapter);
+
+    await expect(
+      detector({ text: "1234", source: { kind: "auto", nanoAllowed: true }, target: "ko" }),
+    ).resolves.toEqual({ kind: "needs-confirmation" });
+    expect(adapter.availability).toHaveBeenCalledWith("es", "ko");
   });
 
   it("normalizes a regional Nano language at the adapter boundary", async () => {
@@ -241,7 +279,11 @@ describe("source detection", () => {
     );
 
     // When
-    const result = detector({ text: "1234", source: { kind: "auto" } });
+    const result = detector({
+      text: "1234",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
 
     // Then
     await expect(result).resolves.toEqual({
@@ -264,7 +306,11 @@ describe("source detection", () => {
     );
 
     // When
-    const result = detector({ text: "1234", source: { kind: "auto" } });
+    const result = detector({
+      text: "1234",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
 
     // Then
     await expect(result).resolves.toEqual({ kind: "needs-confirmation" });
@@ -280,7 +326,11 @@ describe("source detection", () => {
     const detector = createSourceDetector(makeAdapter({ detectWithNano }));
 
     // When
-    const result = detector({ text: "안녕하세요", source: { kind: "auto" } });
+    const result = detector({
+      text: "안녕하세요",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
 
     // Then
     await expect(result).resolves.toEqual({

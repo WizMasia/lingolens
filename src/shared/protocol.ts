@@ -15,6 +15,7 @@ export type RuntimeMessage =
   | { readonly type: "restore-page" }
   | { readonly type: "start-live-chat" }
   | { readonly type: "stop-live-chat" }
+  | { readonly type: "nano-session-authorized" }
   | { readonly type: "detect-nano-source"; readonly text: string; readonly context: string }
   | { readonly type: "offscreen-nano-detect"; readonly text: string; readonly context: string }
   | { readonly type: "get-tab-state" }
@@ -47,10 +48,7 @@ function parseNanoDetectionRequest(
 ): RuntimeMessage | undefined {
   if (!("text" in value) || typeof value.text !== "string") return undefined;
   if (!("context" in value) || typeof value.context !== "string") return undefined;
-  if (
-    type === "offscreen-nano-detect" &&
-    (value.text.length > MAX_NANO_TEXT_LENGTH || value.context.length > MAX_NANO_CONTEXT_LENGTH)
-  ) {
+  if (value.text.length > MAX_NANO_TEXT_LENGTH || value.context.length > MAX_NANO_CONTEXT_LENGTH) {
     return undefined;
   }
   return { type, text: value.text, context: value.context };
@@ -102,6 +100,8 @@ export function parseMessage(value: unknown): RuntimeMessage | undefined {
       return { type: "start-live-chat" };
     case "stop-live-chat":
       return { type: "stop-live-chat" };
+    case "nano-session-authorized":
+      return { type: "nano-session-authorized" };
     case "detect-nano-source":
       return parseNanoDetectionRequest("detect-nano-source", value);
     case "offscreen-nano-detect":

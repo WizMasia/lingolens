@@ -163,12 +163,15 @@ export const createTranslationController = (
     const record = store.getOrCreate(source);
     record.setLanguageOverride(choice);
     liveChat.remember(source, choice);
-    await perform({
-      source,
-      preference:
-        choice.source === "auto" ? { kind: "auto" } : { kind: "fixed", language: choice.source },
-      target: choice.target,
-    });
+    await perform(
+      {
+        source,
+        preference:
+          choice.source === "auto" ? { kind: "auto" } : { kind: "fixed", language: choice.source },
+        target: choice.target,
+      },
+      liveChat.has(record) ? liveChatView : view,
+    );
     page.syncRecords();
   };
 

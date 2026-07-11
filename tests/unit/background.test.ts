@@ -82,7 +82,7 @@ describe("background coordinator", () => {
     expect(broadcast).toHaveBeenCalledOnce();
   });
 
-  it("forwards a Nano source request to the offscreen bridge", async () => {
+  it("forwards a Nano source request only after explicit session preparation", async () => {
     // Given
     const nanoBridge = createNanoBridge();
     const coordinator = createBackgroundCoordinator({
@@ -96,6 +96,15 @@ describe("background coordinator", () => {
     });
 
     // When
+    const beforePreparation = coordinator.receive({
+      type: "detect-nano-source",
+      text: "hola",
+      context: "context",
+    });
+    await expect(beforePreparation).resolves.toEqual({ kind: "unavailable" });
+    expect(nanoBridge.detect).not.toHaveBeenCalled();
+
+    await coordinator.receive({ type: "nano-session-authorized" });
     const result = coordinator.receive({
       type: "detect-nano-source",
       text: "hola",
@@ -126,6 +135,25 @@ describe("background coordinator", () => {
 
     // Then
     expect(nanoBridge.close).toHaveBeenCalledOnce();
+  });
+
+  it("closes the Nano offscreen bridge on restoration and navigation", async () => {
+    const nanoBridge = createNanoBridge();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    await coordinator.receive({ type: "restore-page" });
+    coordinator.navigationStarted(7);
+    await Promise.resolve();
+
+    expect(nanoBridge.close).toHaveBeenCalledTimes(2);
   });
 
   it("recovers live state from the active content script after a worker restart", async () => {

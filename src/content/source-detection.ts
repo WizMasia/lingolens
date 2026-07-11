@@ -21,7 +21,8 @@ export type AutomaticDetectionEvidence = Readonly<{
   provenance: Exclude<DetectionProvenance, "user">;
 }>;
 
-export type SourceDetectionRequest = Pick<TranslationRequest, "text" | "source">;
+export type SourceDetectionRequest = Pick<TranslationRequest, "text" | "source"> &
+  Readonly<{ target?: string }>;
 
 export type SourceDetector = (request: SourceDetectionRequest) => Promise<SourceDetection>;
 
@@ -114,14 +115,16 @@ export const createSourceDetector =
     if (script !== undefined) return detected(script, "script");
 
     const detectWithNano = adapter.detectWithNano;
-    if (detectWithNano === undefined) return { kind: "needs-confirmation" };
+    if (detectWithNano === undefined || request.source.nanoAllowed !== true)
+      return { kind: "needs-confirmation" };
     const nano = await attempt(() => detectWithNano(request.text, detectionText));
     if (nano?.kind === "detected") {
       const language = normalizeLanguage(nano.language);
       if (
         language !== undefined &&
         NANO_SUPPORTED_LANGUAGES.has(language) &&
-        nano.confidence >= 0.8
+        nano.confidence >= 0.8 &&
+        (await hasAvailableNanoPair(adapter, language, request.target))
       ) {
         return detected(language, "gemini-nano");
       }
@@ -129,3 +132,13 @@ export const createSourceDetector =
 
     return { kind: "needs-confirmation" };
   };
+
+const hasAvailableNanoPair = async (
+  adapter: AiAdapter,
+  source: string,
+  target: string | undefined,
+): Promise<boolean> => {
+  const normalizedTarget = normalizeLanguage(target ?? "");
+  if (normalizedTarget === undefined) return false;
+  return (await attempt(() => adapter.availability(source, normalizedTarget))) !== "unavailable";
+};

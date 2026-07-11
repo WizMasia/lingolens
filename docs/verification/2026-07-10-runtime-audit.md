@@ -124,8 +124,9 @@ This installed-Chrome gate has not been run. Selecting **Prepare** can trigger a
 1. Enable Experimental live-chat language assistance and click Prepare in Options.
 2. Confirm the options status reaches Ready without a network request carrying chat text.
 3. Run page translation on YouTube Live Chat; verify a supported normal message uses hover-only translation.
-4. Use the configured menu shortcut over a romanized message, select Hindi, and verify later messages from that author use Hindi while another author's messages remain automatic.
+4. Use the configured menu shortcut over a romanized message, select Hindi, and verify later messages from that author use Hindi while another author's messages remain automatic. Do not claim this recovery for Romanized Urdu while Chrome Translator lacks a supported Urdu pair.
 5. Restore the page; confirm hover translation and author choices no longer apply.
 6. Disable network after preparation and repeat a supported local translation.
+7. Restart the extension worker; confirm Nano is unavailable until the user explicitly clicks Prepare again, with no automatic model download.
 
 If preparation or one offscreen structured detection fails because Chrome capability or activation rules do not permit it, leave Nano disabled, record the observed limitation here, retain per-author manual recovery, and do not claim Nano availability.

@@ -7,6 +7,7 @@ import {
   sameTrigger,
   type TriggerBinding,
 } from "../shared/settings";
+import { installNanoPreparationAction } from "./nano-preparation-action";
 import {
   conflictWarning,
   defaultShortcuts,
@@ -24,6 +25,7 @@ export type OptionsDependencies = Readonly<{
   save(settings: Settings): Promise<void>;
   uiLanguage: string;
   prepareNano?: NanoPreparation["prepare"];
+  authorizeNano?(): Promise<void>;
 }>;
 
 export type OptionsApp = Readonly<{ ready: Promise<void> }>;
@@ -42,14 +44,11 @@ export const createOptionsApp = (
   const source = required(document, "source-language", HTMLSelectElement);
   const target = required(document, "target-language", HTMLSelectElement);
   const liveChatNano = required(document, "live-chat-nano", HTMLInputElement);
-  const prepareNano = required(document, "prepare-live-chat-nano", HTMLButtonElement);
-  const nanoStatus = required(document, "nano-status", HTMLParagraphElement);
   const controls: Record<ShortcutKind, TriggerControls> = {
     translation: triggerControls(document, "trigger"),
     menu: triggerControls(document, "menu-trigger"),
   };
   const status = required(document, "save-status", HTMLParagraphElement);
-  const prepare = dependencies.prepareNano ?? createNanoPreparation().prepare;
   let triggers = defaultShortcuts();
   let capturing: ShortcutKind | null = null;
   let modifierCandidate: TriggerBinding | null = null;
@@ -135,12 +134,10 @@ export const createOptionsApp = (
         },
       );
   });
-  prepareNano.addEventListener("click", () => {
-    void prepare((loaded) => {
-      nanoStatus.textContent = `로컬 모델 준비 중: ${Math.round(loaded * 100)}%`;
-    }).then((result) => {
-      nanoStatus.textContent = result === "ready" ? "준비됨" : "이 기기에서는 사용할 수 없습니다";
-    });
+  installNanoPreparationAction({
+    document,
+    prepare: dependencies.prepareNano ?? createNanoPreparation().prepare,
+    authorize: dependencies.authorizeNano ?? (() => Promise.resolve()),
   });
 
   const ready = dependencies.load().then((settings) => {
@@ -260,6 +257,9 @@ if (typeof chrome !== "undefined") {
     },
     async save(settings) {
       await chrome.storage.sync.set({ [STORAGE_KEY]: settings });
+    },
+    async authorizeNano() {
+      await chrome.runtime.sendMessage({ type: "nano-session-authorized" });
     },
     uiLanguage,
   });

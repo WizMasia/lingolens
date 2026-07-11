@@ -49,11 +49,13 @@ describe("LingoLens static assets", () => {
     expect(english).toContain("Experimental live-chat language assistance is opt-in");
     expect(english).toContain("on-device classifier, not a translator");
     expect(english).toContain("explicitly click Prepare");
-    expect(english).toContain("does not guarantee romanized Hindi or Urdu support");
+    expect(english).toContain("does not guarantee romanized Hindi");
+    expect(english).toContain("Romanized Urdu cannot be recovered");
     expect(korean).toContain("실험적 Live Chat 언어 지원은 선택 기능");
     expect(korean).toContain("기기 내 분류기이며 번역기가 아닙니다");
     expect(korean).toContain("명시적으로 눌러야");
-    expect(korean).toContain("로마자 표기 힌디어 또는 우르두어 지원을 보장하지 않습니다");
+    expect(korean).toContain("로마자 표기 힌디어 인식을 보장하지 않습니다");
+    expect(korean).toContain("로마자 표기 우르두어는 이 방식으로 복구할 수 없습니다");
     expect(privacy).toContain(
       "bounded chat-message text and nearby context only to the Chrome-resident Nano model",
     );

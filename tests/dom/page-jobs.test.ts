@@ -238,6 +238,109 @@ describe("full-page controller", () => {
     expect(requests.map(({ source }) => source.kind)).toContain("auto");
   });
 
+  it("does not apply an author choice to a message already queued", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const first = appendLiveChatMessage(items, "first", "/channel/one");
+    const queued = appendLiveChatMessage(items, "queued", "/channel/one");
+    const firstResult = deferred<TranslationResult>();
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      translate(request) {
+        requests.push(request);
+        return request.text === "first"
+          ? firstResult.promise
+          : Promise.resolve(translated(request.text));
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    expect(requests).toHaveLength(1);
+
+    // When
+    await controller.retranslate(queued, { source: "hi", target: "ko" });
+    firstResult.resolve(translated("first"));
+    await flushMutations();
+    await flushMutations();
+    await flushMutations();
+
+    // Then
+    const queuedRequest = requests.find((request, index) => index > 1 && request.text === "queued");
+    expect(queuedRequest?.source).toMatchObject({ kind: "auto" });
+    expect(first.textContent).toBe("first");
+  });
+
+  it("caches an automatic live-chat decision by unchanged message text", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    appendLiveChatMessage(items, "same text", "/channel/one");
+    appendLiveChatMessage(items, "same text", "/channel/two");
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.startLiveChat();
+    await flushMutations();
+    await flushMutations();
+    await flushMutations();
+
+    // Then
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.source).toMatchObject({
+      kind: "auto",
+      knownDetection: { kind: "detected", language: "en", provenance: "language-detector" },
+    });
+  });
+
+  it("keeps immediate live-chat retranslation hover-only when page mode is inline", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const message = appendLiveChatMessage(items, "namaste", "/channel/one");
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        return translated(`번역:${request.text}`);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.retranslate(message, { source: "hi", target: "ko" });
+
+    // Then
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+  });
+
   it("clears a remembered source when restoring a selected live-chat element", async () => {
     // Given
     testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";

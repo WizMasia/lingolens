@@ -28,6 +28,12 @@ describe("runtime message protocol", () => {
     expect(parseMessage({ type: "detect-nano-source", text: 3, context: "x" })).toBeUndefined();
   });
 
+  it("rejects an oversized Nano source request before it reaches the worker bridge", () => {
+    expect(
+      parseMessage({ type: "detect-nano-source", text: "x".repeat(1_001), context: "context" }),
+    ).toBeUndefined();
+  });
+
   it("rejects an oversized offscreen Nano detection request", () => {
     expect(
       parseMessage({ type: "offscreen-nano-detect", text: "x".repeat(1_001), context: "context" }),

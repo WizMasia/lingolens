@@ -111,15 +111,21 @@ export const createBackgroundCoordinator = (
           dependencies.broadcastSettings();
           return undefined;
         case "translate-page": {
-          const tab = await dependencies.activeTab();
-          if (tab === undefined) return undefined;
-          await queuePageAction(() => startPageAction(tab, message));
+          const tab = dependencies.activeTab();
+          await queuePageAction(async () => {
+            const descriptor = await tab;
+            if (descriptor === undefined) return;
+            await startPageAction(descriptor, message);
+          });
           return undefined;
         }
         case "restore-page": {
-          const tab = await dependencies.activeTab();
-          if (tab === undefined) return undefined;
-          await queuePageAction(() => restorePageAction(tab, message));
+          const tab = dependencies.activeTab();
+          await queuePageAction(async () => {
+            const descriptor = await tab;
+            if (descriptor === undefined) return;
+            await restorePageAction(descriptor, message);
+          });
           return undefined;
         }
         case "start-live-chat":

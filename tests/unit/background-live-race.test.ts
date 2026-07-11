@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createBackgroundCoordinator } from "../../src/background";
+import { type ActiveTab, createBackgroundCoordinator } from "../../src/background";
 
 const deferred = <T>(): Readonly<{
   promise: Promise<T>;
@@ -216,5 +216,43 @@ describe("background live replay races", () => {
       [7, true],
       [7, false],
     ]);
+  });
+
+  it("preserves start receipt order when its active tab lookup is delayed", async () => {
+    // Given
+    const startTab = deferred<ActiveTab | undefined>();
+    let activeTabCalls = 0;
+    let enabled = false;
+    const messages: string[] = [];
+    const coordinator = createBackgroundCoordinator({
+      activeTab() {
+        activeTabCalls += 1;
+        return activeTabCalls === 1 ? startTab.promise : Promise.resolve({ id: 7, url: undefined });
+      },
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat(_tabId, message) {
+        messages.push(message.type);
+      },
+      liveChatState: {
+        async isEnabled() {
+          return enabled;
+        },
+        async setEnabled(_tabId, value) {
+          enabled = value;
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    const restore = coordinator.receive({ type: "restore-page" });
+    startTab.resolve({ id: 7, url: undefined });
+    await Promise.all([start, restore]);
+
+    // Then
+    expect(messages).toEqual(["start-live-chat", "stop-live-chat"]);
+    expect(enabled).toBe(false);
   });
 });

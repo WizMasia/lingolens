@@ -212,7 +212,41 @@ describe("YouTube live chat", () => {
     await next.promise;
 
     // Then
-    expect(translated).toEqual(["First", "Message 3"]);
+    expect(translated).toEqual(["First", "Message 2"]);
+  });
+
+  it("retains a newer fresh batch when the fresh queue reaches capacity", async () => {
+    // Given
+    const items = chatFixture();
+    items.append(messageRenderer("First"));
+    const first = deferred<void>();
+    const next = deferred<void>();
+    const translated: string[] = [];
+    const session = createYouTubeLiveChatSession({
+      document,
+      translate(source) {
+        const text = collectSourceText(source);
+        translated.push(text);
+        if (text === "First") return first.promise;
+        next.resolve();
+        return new Promise<void>(() => undefined);
+      },
+    });
+    await session.start();
+    await flushMutations();
+    for (let index = 2; index <= 101; index += 1) {
+      items.append(messageRenderer(`Message ${index}`));
+    }
+    await flushMutations();
+
+    // When
+    items.append(messageRenderer("Newest"));
+    await flushMutations();
+    first.resolve();
+    await next.promise;
+
+    // Then
+    expect(translated).toEqual(["First", "Newest"]);
   });
 
   it("processes a new message before historical queued messages", async () => {

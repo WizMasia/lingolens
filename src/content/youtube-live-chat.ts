@@ -74,7 +74,7 @@ export const createYouTubeLiveChatSession = (
           break;
         }
       }
-      queue.splice(historyIndex === -1 ? 0 : historyIndex, 1);
+      queue.splice(historyIndex === -1 ? -1 : historyIndex, 1);
     }
   };
 

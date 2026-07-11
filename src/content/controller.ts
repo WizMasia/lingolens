@@ -7,8 +7,9 @@ import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
 import { createInlineView } from "./inline-view";
 import type { PageJobOutcome } from "./jobs";
-import { createLiveChatLanguageMemory } from "./live-chat-language-memory";
+import { createLiveChatSessionController } from "./live-chat-session-controller";
 import { createPageController } from "./page-controller";
+import { createPoliteAnnouncer } from "./polite-announcer";
 import {
   createRecordStore,
   type ElementRecord,
@@ -21,7 +22,6 @@ import {
   type TranslationAttempt,
   type TranslationRuntime,
 } from "./translation-attempt";
-import { createYouTubeLiveChatSession } from "./youtube-live-chat";
 
 export type { ElementLanguageChoice } from "./element-menu";
 
@@ -56,11 +56,6 @@ export type TranslationControllerDependencies = Readonly<{
   languages?: readonly ElementLanguageChoice[];
   notice?: (message: string) => void;
   onState?: (state: TabState) => void;
-}>;
-
-type PoliteAnnouncer = Readonly<{
-  announce(message: string): void;
-  destroy(): void;
 }>;
 
 const NO_TARGET_NOTICE = "텍스트 요소를 선택하거나 가리켜 주세요.";
@@ -130,8 +125,6 @@ export const createTranslationController = (
     attempt: TranslationAttempt,
     translationView: TranslationView = view,
   ): Promise<boolean> => executeTranslation(attempt, { ...runtime, view: () => translationView });
-  const liveChatRecords = new WeakSet<ElementRecord>();
-  const liveChatLanguages = createLiveChatLanguageMemory();
 
   const page = createPageController({
     document: dependencies.document,
@@ -149,28 +142,18 @@ export const createTranslationController = (
       return record.phase === "error" || record.phase === "stale" ? "failed" : "skipped";
     },
     onStale(record) {
-      (liveChatRecords.has(record) ? liveChatView : view).markStale(record);
+      (liveChat.has(record) ? liveChatView : view).markStale(record);
     },
     onState: dependencies.onState ?? (() => undefined),
   });
-  const liveChat = createYouTubeLiveChatSession({
+  const liveChat = createLiveChatSessionController({
     document: dependencies.document,
-    async translate(source, signal) {
-      liveChatRecords.add(store.getOrCreate(source));
-      try {
-        await perform(
-          {
-            source,
-            preference: liveChatPreference(source),
-            target: targetLanguage(settings),
-            signal,
-          },
-          liveChatView,
-        );
-      } finally {
-        page.syncRecords();
-      }
+    store,
+    settings: () => settings,
+    async translate(source, preference, signal) {
+      await perform({ source, preference, target: targetLanguage(settings), signal }, liveChatView);
     },
+    syncRecords: page.syncRecords,
   });
 
   const retranslate = async (
@@ -179,7 +162,7 @@ export const createTranslationController = (
   ): Promise<void> => {
     const record = store.getOrCreate(source);
     record.setLanguageOverride(choice);
-    rememberLiveChatLanguage(source, choice);
+    liveChat.remember(source, choice);
     await perform({
       source,
       preference:
@@ -189,36 +172,10 @@ export const createTranslationController = (
     page.syncRecords();
   };
 
-  const liveChatPreference = (source: HTMLElement): Settings["source"] => {
-    const override = store.getOrCreate(source).languageOverride;
-    if (override !== null) {
-      return override.source === "auto"
-        ? { kind: "auto" }
-        : { kind: "fixed", language: override.source };
-    }
-    const authorId = liveChat.authorId(source);
-    const language = authorId === undefined ? undefined : liveChatLanguages.get(authorId);
-    return language === undefined ? settings.source : { kind: "fixed", language };
-  };
-
-  const rememberLiveChatLanguage = (source: HTMLElement, choice: ElementLanguageOverride): void => {
-    const authorId = liveChat.authorId(source);
-    if (authorId === undefined) return;
-    if (choice.source === "auto") {
-      liveChatLanguages.clear(authorId);
-      return;
-    }
-    liveChatLanguages.set(authorId, choice.source);
-  };
-
-  const stopLiveChat = (): void => {
-    liveChat.stop();
-    liveChatLanguages.destroy();
-  };
-
   const restoreElement = (source: HTMLElement): void => {
     const record = store.getOrCreate(source);
     record.setLanguageOverride(null);
+    liveChat.restore(source);
     store.restoreTranslation(source);
     page.syncRecords();
   };
@@ -252,11 +209,11 @@ export const createTranslationController = (
     },
     translatePage: page.translatePage,
     restorePage() {
-      stopLiveChat();
+      liveChat.stop();
       page.restorePage();
     },
     startLiveChat: liveChat.start,
-    stopLiveChat,
+    stopLiveChat: liveChat.stop,
     getState: page.getState,
     retranslate,
     openElementMenu(source) {
@@ -270,14 +227,13 @@ export const createTranslationController = (
       view.destroy();
       view = createView();
       for (const record of store.active) {
-        if (!liveChatRecords.has(record)) view.render(record);
+        if (!liveChat.has(record)) view.render(record);
       }
     },
     destroy() {
       if (!active) return;
       active = false;
       liveChat.destroy();
-      liveChatLanguages.destroy();
       liveChatView.destroy();
       page.destroy();
       menu.destroy();
@@ -286,30 +242,6 @@ export const createTranslationController = (
       store.clear();
       dependencies.engine.destroy();
       hovered = null;
-    },
-  };
-};
-
-const createPoliteAnnouncer = (document: Document): PoliteAnnouncer => {
-  const host = document.createElement("div");
-  host.setAttribute("data-local-translator-ui", "announcer");
-  const shadow = host.attachShadow({ mode: "closed" });
-  const style = document.createElement("style");
-  style.textContent = `
-    :host { block-size: 1px; clip-path: inset(50%); inline-size: 1px;
-      overflow: hidden; position: fixed; white-space: nowrap; }
-  `;
-  const status = document.createElement("div");
-  status.setAttribute("role", "status");
-  status.setAttribute("aria-live", "polite");
-  shadow.append(style, status);
-  document.body.append(host);
-  return {
-    announce(message) {
-      status.textContent = message;
-    },
-    destroy() {
-      host.remove();
     },
   };
 };

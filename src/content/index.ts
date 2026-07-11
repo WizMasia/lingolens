@@ -1,16 +1,12 @@
 import { LANGUAGE_CHOICES } from "../shared/languages";
 import { parseMessage } from "../shared/protocol";
-import {
-  isModifierTrigger,
-  matchesTrigger,
-  parseSettings,
-  type Settings,
-  type TriggerBinding,
-} from "../shared/settings";
+import { parseSettings, type Settings } from "../shared/settings";
 import { createTranslationEngine } from "./ai-engine";
 import { createChromiumAiAdapter } from "./chromium-ai-adapter";
+import { createContentShortcutHandlers } from "./content-shortcuts";
 import { createTranslationController, type TranslationController } from "./controller";
-import { nearestTarget } from "./targets";
+
+export { eventElement } from "./content-shortcuts";
 
 export type ContentDependencies = Readonly<{
   controller: TranslationController;
@@ -43,12 +39,6 @@ type LiveChatCommands = Readonly<{
 
 export const productionLanguages = () => LANGUAGE_CHOICES;
 
-export const eventElement = (event: Pick<Event, "composedPath" | "target">): Element | null => {
-  const composedTarget = event.composedPath().find((target) => target instanceof Element);
-  if (composedTarget instanceof Element) return composedTarget;
-  return event.target instanceof Element ? event.target : null;
-};
-
 export const connectContentPort = (
   runtime: ContentPortRuntime,
   app: ContentApp,
@@ -78,60 +68,15 @@ export const createContentApp = (
   document: Document,
   dependencies: ContentDependencies,
 ): ContentApp => {
-  let settings = dependencies.controller.settings;
-  let currentTarget: HTMLElement | null = null;
-  let pendingAction: ShortcutAction | null = null;
-  const isTopFrame = dependencies.isTopFrame?.() ?? true;
-
-  const isTrustedEvent = (event: Event): boolean =>
-    dependencies.isTrustedEvent?.(event) ?? event.isTrusted;
-  const executeAction = (action: ShortcutAction, event: KeyboardEvent): void => {
-    if (action === "translation" && !isTopFrame) return;
-    if (action === "translation") {
-      void dependencies.controller.translateTarget();
-      return;
-    }
-    const target = currentTarget ?? nearestTarget(eventElement(event));
-    if (target !== undefined) void dependencies.controller.openElementMenu(target);
-  };
-
-  const onPointer = (event: PointerEvent): void => {
-    if (!isTrustedEvent(event)) return;
-    currentTarget = nearestTarget(eventElement(event)) ?? null;
-    dependencies.controller.setHovered(currentTarget);
-  };
-  const onKey = (event: KeyboardEvent): void => {
-    if (!isTrustedEvent(event) || event.repeat) return;
-    if (isEditable(event.composedPath()[0])) {
-      pendingAction = null;
-      return;
-    }
-    const action = matchedAction(event, settings);
-    if (action === null) {
-      pendingAction = null;
-      return;
-    }
-    event.preventDefault();
-    if (isModifierTrigger(actionBinding(action, settings))) {
-      if (!isTopFrame && action === "menu") {
-        executeAction(action, event);
-        return;
-      }
-      pendingAction = action;
-      return;
-    }
-    pendingAction = null;
-    executeAction(action, event);
-  };
-  const onKeyUp = (event: KeyboardEvent): void => {
-    if (!isTrustedEvent(event)) return;
-    const action = pendingAction;
-    pendingAction = null;
-    if (action === null || isEditable(event.composedPath()[0])) return;
-    if (!matchesTrigger(event, actionBinding(action, settings))) return;
-    event.preventDefault();
-    executeAction(action, event);
-  };
+  const shortcuts = createContentShortcutHandlers({
+    document,
+    controller: dependencies.controller,
+    settings: dependencies.controller.settings,
+    isTopFrame: dependencies.isTopFrame?.() ?? true,
+    ...(dependencies.isTrustedEvent === undefined
+      ? {}
+      : { isTrustedEvent: dependencies.isTrustedEvent }),
+  });
   const handleMessage = (value: unknown): Promise<unknown> | unknown => {
     const message = parseMessage(value);
     if (message === undefined) return undefined;
@@ -152,8 +97,7 @@ export const createContentApp = (
         return dependencies.controller.getState();
       case "settings-changed":
         return dependencies.loadSettings().then((next) => {
-          pendingAction = null;
-          settings = next;
+          shortcuts.applySettings(next);
           dependencies.controller.applySettings(next);
         });
       case "tab-state":
@@ -165,34 +109,18 @@ export const createContentApp = (
     }
   };
 
-  document.addEventListener("pointerover", onPointer, true);
-  document.addEventListener("keydown", onKey, true);
-  document.addEventListener("keyup", onKeyUp, true);
   void dependencies.loadSettings().then((loaded) => {
-    settings = loaded;
+    shortcuts.applySettings(loaded);
     dependencies.controller.applySettings(loaded);
   });
   return {
     handleMessage,
     destroy() {
-      document.removeEventListener("pointerover", onPointer, true);
-      document.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("keyup", onKeyUp, true);
+      shortcuts.destroy();
       dependencies.controller.destroy();
     },
   };
 };
-
-type ShortcutAction = "translation" | "menu";
-
-const matchedAction = (event: KeyboardEvent, settings: Settings): ShortcutAction | null => {
-  if (matchesTrigger(event, settings.menuTrigger)) return "menu";
-  if (matchesTrigger(event, settings.trigger)) return "translation";
-  return null;
-};
-
-const actionBinding = (action: ShortcutAction, settings: Settings): TriggerBinding =>
-  action === "menu" ? settings.menuTrigger : settings.trigger;
 
 const hasLiveChatCommands = (
   controller: TranslationController,
@@ -201,11 +129,6 @@ const hasLiveChatCommands = (
   typeof controller.startLiveChat === "function" &&
   "stopLiveChat" in controller &&
   typeof controller.stopLiveChat === "function";
-
-const isEditable = (value: EventTarget | undefined): boolean =>
-  value instanceof Element &&
-  (value.matches("input, textarea, select, [contenteditable]:not([contenteditable='false'])") ||
-    value.closest("[contenteditable]:not([contenteditable='false'])") !== null);
 
 const assertNever = (value: never): never => {
   throw new TypeError(`Unhandled message: ${String(value)}`);

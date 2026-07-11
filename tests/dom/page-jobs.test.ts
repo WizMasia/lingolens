@@ -238,6 +238,44 @@ describe("full-page controller", () => {
     expect(requests.map(({ source }) => source.kind)).toContain("auto");
   });
 
+  it("clears a remembered source when restoring a selected live-chat element", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const selected = appendLiveChatMessage(items, "namaste", "/channel/one");
+    const requests: TranslationRequest[] = [];
+    const nextRequest = deferred<void>();
+    let awaitNextRequest = false;
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        if (awaitNextRequest) nextRequest.resolve();
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    await controller.retranslate(selected, { source: "hi", target: "ko" });
+    controller.restoreElement(selected);
+    requests.length = 0;
+    awaitNextRequest = true;
+
+    // When
+    appendLiveChatMessage(items, "namaste", "/channel/one");
+    await nextRequest.promise;
+
+    // Then
+    expect(requests[0]?.source).toMatchObject({ kind: "auto" });
+  });
+
   it("reports partial failure while allowing successful peers to finish", async () => {
     // Given
     addSources("First", "Broken", "Third");

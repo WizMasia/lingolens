@@ -36,4 +36,34 @@ describe("LingoLens static assets", () => {
     await expect(read("PRIVACY.md")).resolves.toContain("No analytics");
     await expect(read("THIRD_PARTY_NOTICES.md")).resolves.toContain("esbuild");
   });
+
+  it("documents the opt-in Nano live-chat limits and pending manual gate", async () => {
+    const read = (path: string) => readFile(path, "utf8");
+    const [english, korean, privacy, audit] = await Promise.all([
+      read("README.md"),
+      read("README.ko.md"),
+      read("PRIVACY.md"),
+      read("docs/verification/2026-07-10-runtime-audit.md"),
+    ]);
+
+    expect(english).toContain("Experimental live-chat language assistance is opt-in");
+    expect(english).toContain("on-device classifier, not a translator");
+    expect(english).toContain("explicitly click Prepare");
+    expect(english).toContain("does not guarantee romanized Hindi or Urdu support");
+    expect(korean).toContain("실험적 Live Chat 언어 지원은 선택 기능");
+    expect(korean).toContain("기기 내 분류기이며 번역기가 아닙니다");
+    expect(korean).toContain("명시적으로 눌러야");
+    expect(korean).toContain("로마자 표기 힌디어 또는 우르두어 지원을 보장하지 않습니다");
+    expect(privacy).toContain(
+      "bounded chat-message text and nearby context only to the Chrome-resident Nano model",
+    );
+    expect(privacy).toContain("not transmitted outside Chrome or retained after the tab session");
+    expect(audit).toContain("Nano feasibility gate: pending");
+    expect(audit).toContain(
+      "Confirm the options status reaches Ready without a network request carrying chat text.",
+    );
+    expect(audit).toContain(
+      "Disable network after preparation and repeat a supported local translation.",
+    );
+  });
 });

@@ -18,6 +18,8 @@ The extension does not request a separate translation-service host permission, l
 
 Chrome itself determines whether on-device language detection and translation models are available and manages the first acquisition of a required model or language pair. That Chrome-managed process may require a network connection. LingoLens does not control model availability or acquisition and does not promise that every device or pair works offline.
 
+Optional experimental Live Chat language assistance can pass bounded chat-message text and nearby context only to the Chrome-resident Nano model. Nano prompts stay inside Chrome: this bounded text and context are not transmitted outside Chrome or retained after the tab session. User-triggered preparation may download a Chrome-managed model; LingoLens does not control that download.
+
 ## Changes
 
 Material changes to this policy will be recorded in [CHANGELOG.md](CHANGELOG.md).

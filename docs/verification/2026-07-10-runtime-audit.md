@@ -116,3 +116,16 @@ The extension was rebuilt, loaded unpacked from `dist/`, and manually reloaded i
 
 - Full-page activation and each popup/options control need a user-visible acceptance pass in the installed extension UI.
 - A public YouTube live-chat iframe was confirmed present on a current live page, but the popup-driven **페이지 전체 번역** action has not yet been activated in a real public chat. Its behavior is covered by the dynamic DOM, frame-routing, worker-restart, and race regression suites; it should remain an explicit private-beta acceptance item before public release.
+
+## Nano feasibility gate: pending
+
+This installed-Chrome gate has not been run. Selecting **Prepare** can trigger a Chrome-managed Gemini Nano model download, so it requires user-facing confirmation at the time of preparation. Nano remains disabled unless the user explicitly enables it and saves the setting.
+
+1. Enable Experimental live-chat language assistance and click Prepare in Options.
+2. Confirm the options status reaches Ready without a network request carrying chat text.
+3. Run page translation on YouTube Live Chat; verify a supported normal message uses hover-only translation.
+4. Use the configured menu shortcut over a romanized message, select Hindi, and verify later messages from that author use Hindi while another author's messages remain automatic.
+5. Restore the page; confirm hover translation and author choices no longer apply.
+6. Disable network after preparation and repeat a supported local translation.
+
+If preparation or one offscreen structured detection fails because Chrome capability or activation rules do not permit it, leave Nano disabled, record the observed limitation here, retain per-author manual recovery, and do not claim Nano availability.

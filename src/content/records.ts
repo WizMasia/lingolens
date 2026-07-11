@@ -173,10 +173,11 @@ export class ElementRecord {
 
   setLanguageOverride(override: ElementLanguageOverride | null): void {
     this.#languageOverride = override;
-    this.#detection =
-      override !== null && override.source !== "auto"
-        ? { kind: "user-selected", language: override.source }
-        : { kind: "not-detected" };
+    if (override !== null && override.source !== "auto") {
+      this.#detection = { kind: "user-selected", language: override.source };
+    } else if (this.#detection.kind === "user-selected") {
+      this.#detection = { kind: "not-detected" };
+    }
   }
 
   setDetection(detection: ElementDetectionState): void {

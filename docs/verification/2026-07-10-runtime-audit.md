@@ -115,4 +115,4 @@ The extension was rebuilt, loaded unpacked from `dist/`, and manually reloaded i
 ### Remaining manual evidence
 
 - Full-page activation and each popup/options control need a user-visible acceptance pass in the installed extension UI.
-- A public YouTube live-chat iframe was confirmed present on a current live page, but the popup-driven `Start live chat` action has not yet been activated in a real public chat. Its behavior is covered by the dynamic DOM, frame-routing, worker-restart, and race regression suites; it should remain an explicit private-beta acceptance item before public release.
+- A public YouTube live-chat iframe was confirmed present on a current live page, but the popup-driven **페이지 전체 번역** action has not yet been activated in a real public chat. Its behavior is covered by the dynamic DOM, frame-routing, worker-restart, and race regression suites; it should remain an explicit private-beta acceptance item before public release.

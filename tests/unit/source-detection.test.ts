@@ -228,6 +228,48 @@ describe("source detection", () => {
     expect(detectWithNano).toHaveBeenCalledWith("1234", "1234");
   });
 
+  it("normalizes a regional Nano language at the adapter boundary", async () => {
+    // Given
+    const detector = createSourceDetector(
+      makeAdapter({
+        detectWithNano: vi.fn().mockResolvedValue({
+          kind: "detected",
+          language: "es-ES",
+          confidence: 0.9,
+        }),
+      }),
+    );
+
+    // When
+    const result = detector({ text: "1234", source: { kind: "auto" } });
+
+    // Then
+    await expect(result).resolves.toEqual({
+      kind: "detected",
+      language: "es",
+      provenance: "gemini-nano",
+    });
+  });
+
+  it("rejects an unsupported Nano language at the adapter boundary", async () => {
+    // Given
+    const detector = createSourceDetector(
+      makeAdapter({
+        detectWithNano: vi.fn().mockResolvedValue({
+          kind: "detected",
+          language: "sv",
+          confidence: 0.9,
+        }),
+      }),
+    );
+
+    // When
+    const result = detector({ text: "1234", source: { kind: "auto" } });
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "needs-confirmation" });
+  });
+
   it("preserves script detection before Nano", async () => {
     // Given
     const detectWithNano = vi.fn().mockResolvedValue({

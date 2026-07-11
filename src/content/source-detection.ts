@@ -1,4 +1,4 @@
-import { normalizeLanguage } from "../shared/languages";
+import { LANGUAGE_CHOICES, normalizeLanguage } from "../shared/languages";
 import type { AiAdapter, TranslationRequest } from "./ai-engine";
 import { inferScriptLanguage } from "./script-language";
 
@@ -27,6 +27,7 @@ export type SourceDetector = (request: SourceDetectionRequest) => Promise<Source
 
 const PRIMARY_CONFIDENCE = 0.6;
 const SECONDARY_PERCENTAGE = 80;
+const NANO_SUPPORTED_LANGUAGES = new Set(LANGUAGE_CHOICES.map(({ value }) => value));
 
 type PrimaryEvidence = Readonly<{
   accepted?: string;
@@ -115,8 +116,15 @@ export const createSourceDetector =
     const detectWithNano = adapter.detectWithNano;
     if (detectWithNano === undefined) return { kind: "needs-confirmation" };
     const nano = await attempt(() => detectWithNano(request.text, detectionText));
-    if (nano?.kind === "detected" && nano.confidence >= 0.8) {
-      return detected(nano.language, "gemini-nano");
+    if (nano?.kind === "detected") {
+      const language = normalizeLanguage(nano.language);
+      if (
+        language !== undefined &&
+        NANO_SUPPORTED_LANGUAGES.has(language) &&
+        nano.confidence >= 0.8
+      ) {
+        return detected(language, "gemini-nano");
+      }
     }
 
     return { kind: "needs-confirmation" };

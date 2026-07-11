@@ -20,4 +20,14 @@ describe("LingoLens static assets", () => {
     await expect(pngSize("src/icons/icon-48.png")).resolves.toEqual([48, 48]);
     await expect(pngSize("src/icons/icon-128.png")).resolves.toEqual([128, 128]);
   });
+
+  it("contains the required user and policy documents", async () => {
+    const read = (path: string) => readFile(path, "utf8");
+    await expect(read("README.md")).resolves.toContain("LingoLens");
+    await expect(read("README.md")).resolves.toContain("ringo");
+    await expect(read("README.ko.md")).resolves.toContain("LingoLens");
+    await expect(read("LICENSE")).resolves.toContain("Apache License");
+    await expect(read("PRIVACY.md")).resolves.toContain("No analytics");
+    await expect(read("THIRD_PARTY_NOTICES.md")).resolves.toContain("esbuild");
+  });
 });

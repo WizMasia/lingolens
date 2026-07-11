@@ -1,12 +1,8 @@
 import type { TabState } from "../shared/protocol";
 import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
-import {
-  createElementMenu,
-  type ElementLanguageChoice,
-  type ElementMenu,
-  type ElementMenuSelection,
-} from "./element-menu";
+import { createElementMenu, type ElementLanguageChoice, type ElementMenu } from "./element-menu";
+import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
 import { createInlineView } from "./inline-view";
 import type { PageJobOutcome } from "./jobs";
@@ -73,7 +69,14 @@ export const createTranslationController = (
   let hovered: HTMLElement | null = null;
   let view: TranslationView;
   const openMenu = async (record: ElementRecord): Promise<void> => {
-    const result = await menu.open(record.source, menuSelection(record, settings));
+    const inspection = inspectMenuSelection({
+      engine: dependencies.engine,
+      record,
+      settings,
+      store,
+    });
+    const selection = inspection instanceof Promise ? await inspection : inspection;
+    const result = await menu.open(record.source, selection);
     switch (result.kind) {
       case "translate":
         await retranslate(record.source, result);
@@ -235,20 +238,6 @@ const createPoliteAnnouncer = (document: Document): PoliteAnnouncer => {
 
 const targetLanguage = (settings: Settings): string =>
   settings.target.kind === "fixed" ? settings.target.language : settings.target.resolvedLanguage;
-
-const menuSelection = (record: ElementRecord, settings: Settings): ElementMenuSelection => {
-  const detectedSource = record.lastSuccess?.sourceLanguage;
-  return {
-    source:
-      record.languageOverride?.source ??
-      (settings.source.kind === "fixed" ? settings.source.language : "auto"),
-    target:
-      record.languageOverride?.target ??
-      record.lastSuccess?.targetLanguage ??
-      targetLanguage(settings),
-    ...(detectedSource === undefined ? {} : { detectedSource }),
-  };
-};
 
 const settingsLanguages = (settings: Settings): readonly ElementLanguageChoice[] => {
   const values = new Set<string>([targetLanguage(settings)]);

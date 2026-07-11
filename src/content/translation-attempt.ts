@@ -2,6 +2,7 @@ import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
 import {
   type DetectionProvenance,
+  type SourceDetectionRequest,
   type TranslationEngine,
   TranslationError,
   type TranslationRequest,
@@ -94,8 +95,15 @@ const translationRequest = (attempt: TranslationAttempt, text: string): Translat
   if (attempt.preference.kind === "fixed") {
     return { text, source: attempt.preference, target: attempt.target };
   }
-  const languageHint = nearestLanguage(attempt.source);
-  const context = nearbyContext(attempt.source, text);
+  return { ...sourceDetectionRequest(attempt.source, text), target: attempt.target };
+};
+
+export const sourceDetectionRequest = (
+  source: HTMLElement,
+  text: string,
+): SourceDetectionRequest => {
+  const languageHint = nearestLanguage(source);
+  const context = nearbyContext(source, text);
   return {
     text,
     source: {
@@ -103,7 +111,6 @@ const translationRequest = (attempt: TranslationAttempt, text: string): Translat
       ...(languageHint === undefined ? {} : { languageHint }),
       ...(context.length === 0 ? {} : { context }),
     },
-    target: attempt.target,
   };
 };
 

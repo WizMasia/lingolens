@@ -119,7 +119,11 @@ describe("per-element retranslation", () => {
     const menu = createElementMenu(document, LANGUAGES);
 
     // When
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const shadow = shadowRoots.get(host);
@@ -139,7 +143,11 @@ describe("per-element retranslation", () => {
     source.tabIndex = 0;
     source.focus();
     const menu = createElementMenu(document, LANGUAGES);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const sourceSelect = shadowRoots
@@ -172,7 +180,11 @@ describe("per-element retranslation", () => {
     const menu = createElementMenu(document, LANGUAGES);
 
     // When
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
 
     // Then
@@ -219,7 +231,7 @@ describe("per-element retranslation", () => {
     await pending;
   });
 
-  it("shows an unknown detected source before the element has a successful translation", async () => {
+  it("shows detected source evidence before the element has a successful translation", async () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
@@ -243,11 +255,13 @@ describe("per-element retranslation", () => {
 
     // When
     const pending = controller.openElementMenu(source);
+    await Promise.resolve();
+    await Promise.resolve();
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     const menuText = host === null ? "" : (shadowRoots.get(host)?.textContent ?? "");
 
     // Then
-    expect(menuText).toContain("Detected source: Unknown");
+    expect(menuText).toContain("Detected source: English (Chrome AI)");
 
     controller.destroy();
     await pending;
@@ -257,7 +271,11 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const menu = createElementMenu(document, LANGUAGES);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
 
     // When
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true, composed: true }));
@@ -271,7 +289,11 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const menu = createElementMenu(document, LANGUAGES);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const shadow = shadowRoots.get(host);
@@ -307,7 +329,11 @@ describe("per-element retranslation", () => {
       { value: "en", label: "English duplicate" },
       { value: "ko", label: "Korean" },
     ]);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const shadow = shadowRoots.get(host);

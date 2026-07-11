@@ -59,9 +59,7 @@ describe("Chromium AI adapter", () => {
       },
     });
 
-    await expect(
-      createChromiumAiAdapter().detectWithChrome("Brief"),
-    ).resolves.toBeUndefined();
+    await expect(createChromiumAiAdapter().detectWithChrome("Brief")).resolves.toBeUndefined();
   });
 
   it("returns no secondary evidence for non-Error Chrome i18n failures", async () => {
@@ -70,9 +68,7 @@ describe("Chromium AI adapter", () => {
       value: { i18n: { detectLanguage: vi.fn().mockRejectedValue("CLD failed") } },
     });
 
-    await expect(
-      createChromiumAiAdapter().detectWithChrome("Brief"),
-    ).resolves.toBeUndefined();
+    await expect(createChromiumAiAdapter().detectWithChrome("Brief")).resolves.toBeUndefined();
   });
 
   it("returns no secondary evidence when Chrome i18n throws synchronously", async () => {
@@ -87,9 +83,7 @@ describe("Chromium AI adapter", () => {
       },
     });
 
-    await expect(
-      createChromiumAiAdapter().detectWithChrome("Brief"),
-    ).resolves.toBeUndefined();
+    await expect(createChromiumAiAdapter().detectWithChrome("Brief")).resolves.toBeUndefined();
   });
 
   it("reports API absence without reading missing globals", async () => {

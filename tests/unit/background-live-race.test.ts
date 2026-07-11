@@ -355,4 +355,37 @@ describe("background live replay races", () => {
     // Then
     expect(enabled).toBe(false);
   });
+
+  it("does not replay stale intent while navigation waits to clear storage", async () => {
+    // Given
+    const clearWrite = deferred<void>();
+    const clearWriteStarted = deferred<void>();
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn(),
+      sendToLiveChat,
+      liveChatState: {
+        async isEnabled() {
+          return true;
+        },
+        async setEnabled(_tabId, enabled) {
+          if (enabled) return;
+          clearWriteStarted.resolve();
+          await clearWrite.promise;
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    coordinator.navigationStarted(7);
+    await clearWriteStarted.promise;
+    await coordinator.liveChatEndpointRegistered(7);
+
+    // Then
+    expect(sendToLiveChat).not.toHaveBeenCalledWith(7, { type: "start-live-chat" });
+    clearWrite.resolve();
+  });
 });

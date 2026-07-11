@@ -159,7 +159,7 @@ Code and preformatted blocks are skipped by default because translating source c
 
 For automatic mode, language is detected per element. Detection follows this order:
 
-1. Use an explicit, valid element or ancestor `lang` attribute when present.
+1. Use an explicit, valid `lang` attribute on the element or a content ancestor when present. The document-root and body `lang` values describe the page default and do not override per-element detection on multilingual pages.
 2. Detect from the element's text when it is long enough for reliable classification.
 3. For short text, detect using a bounded combination of the element and nearby textual context, while translating only the element's own text.
 4. If confidence remains below the chosen threshold, mark the source unknown and ask for a source language through the element action rather than guessing.

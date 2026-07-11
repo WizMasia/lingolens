@@ -19,7 +19,7 @@ The floating menu displays these states as `Not detected yet`, the language and 
 
 Automatic detection runs per element in this order:
 
-1. Use a valid `lang` attribute on the element or its nearest ancestor.
+1. Use a valid `lang` attribute on the element or its nearest content ancestor. The root `html` and `body` language defaults do not override per-element detection on multilingual pages.
 2. Run Chrome's `LanguageDetector` on the element text. Accept the top normalized candidate when its confidence is at least `0.6`.
 3. When the first result is uncertain, retry `LanguageDetector` with bounded nearby context. The retry input includes the element text and nearby visible text but never changes the text sent to the translator.
 4. Run `chrome.i18n.detectLanguage()` on the same bounded context. Ignore `und`. Accept the top normalized language when Chrome reports the result as reliable. For an unreliable result, accept it only when its percentage is at least `80` and it agrees with a candidate returned by `LanguageDetector`.

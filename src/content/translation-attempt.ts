@@ -180,7 +180,11 @@ export const sourceRecordText = (record: ElementRecord): string =>
     .join(" ");
 
 const nearestLanguage = (source: HTMLElement): string | undefined => {
-  const language = source.closest("[lang]")?.getAttribute("lang")?.trim();
+  const holder = source.closest("[lang]");
+  if (holder === source.ownerDocument.documentElement || holder === source.ownerDocument.body) {
+    return undefined;
+  }
+  const language = holder?.getAttribute("lang")?.trim();
   return language === undefined || language.length === 0 ? undefined : normalizeLanguage(language);
 };
 

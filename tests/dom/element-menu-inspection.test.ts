@@ -53,7 +53,10 @@ const deferredDetection = (): Readonly<{
 };
 
 describe("element menu source inspection", () => {
-  beforeEach(() => document.body.replaceChildren());
+  beforeEach(() => {
+    document.body.replaceChildren();
+    document.documentElement.removeAttribute("lang");
+  });
 
   it("detects an untouched source before opening its menu without translating or rendering", async () => {
     const source = document.createElement("p");
@@ -98,6 +101,48 @@ describe("element menu source inspection", () => {
     });
     expect(translate).not.toHaveBeenCalled();
     expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+  });
+
+  it("detects multilingual content instead of inheriting the document language", async () => {
+    document.documentElement.lang = "en";
+    const source = document.createElement("p");
+    source.textContent = "このページは端末上の翻訳機能を確認するためのテストです。";
+    document.body.append(source);
+    const detectSource = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "ja",
+      provenance: "language-detector",
+    });
+    let openedSelection: ElementMenuSelection | undefined;
+    const menu: ElementMenu = {
+      async open(_anchor, selection): Promise<ElementMenuResult> {
+        openedSelection = selection;
+        return { kind: "cancel" };
+      },
+      announce() {},
+      destroy() {},
+    };
+    const engine: TranslationEngine = {
+      detectSource,
+      translate: vi.fn(),
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, menu, settings });
+
+    await controller.openElementMenu(source);
+
+    expect(detectSource).toHaveBeenCalledWith({
+      text: source.textContent,
+      source: { kind: "auto" },
+    });
+    expect(openedSelection?.detection).toEqual({
+      kind: "detected",
+      language: "ja",
+      provenance: "language-detector",
+    });
   });
 
   it("does not commit asynchronous inspection after the source changes", async () => {

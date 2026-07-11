@@ -1,6 +1,7 @@
 import type { TabState } from "../shared/protocol";
 import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
+import { TranslationError } from "./ai-engine";
 import { createElementMenu, type ElementLanguageChoice, type ElementMenu } from "./element-menu";
 import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
@@ -67,6 +68,7 @@ export const createTranslationController = (
   const notice = dependencies.notice ?? (() => undefined);
   let settings = dependencies.settings;
   let hovered: HTMLElement | null = null;
+  let active = true;
   let view: TranslationView;
   const openMenu = async (record: ElementRecord): Promise<void> => {
     const inspection = inspectMenuSelection({
@@ -76,6 +78,7 @@ export const createTranslationController = (
       store,
     });
     const selection = inspection instanceof Promise ? await inspection : inspection;
+    if (!active) return;
     const result = await menu.open(record.source, selection);
     switch (result.kind) {
       case "translate":
@@ -90,7 +93,15 @@ export const createTranslationController = (
         return assertNever(result);
     }
   };
-  const actions = { onAction: (record: ElementRecord): void => void openMenu(record) };
+  const actions = {
+    onAction(record: ElementRecord): void {
+      void openMenu(record).catch((error: unknown) => {
+        if (!active && error instanceof TranslationError && error.code === "api-unavailable")
+          return;
+        throw error;
+      });
+    },
+  };
   const createView = (): TranslationView =>
     settings.displayMode === "inline"
       ? createInlineView(dependencies.document, actions)
@@ -140,20 +151,20 @@ export const createTranslationController = (
     choice: ElementLanguageOverride,
   ): Promise<void> => {
     const record = store.getOrCreate(source);
-    const succeeded = await perform({
+    record.setLanguageOverride(choice);
+    await perform({
       source,
       preference:
         choice.source === "auto" ? { kind: "auto" } : { kind: "fixed", language: choice.source },
       target: choice.target,
     });
-    if (succeeded) record.setLanguageOverride(choice);
     page.syncRecords();
   };
 
   const restoreElement = (source: HTMLElement): void => {
     const record = store.getOrCreate(source);
     record.setLanguageOverride(null);
-    store.remove(source);
+    store.restoreTranslation(source);
     page.syncRecords();
   };
 
@@ -201,6 +212,8 @@ export const createTranslationController = (
       for (const record of store.active) view.render(record);
     },
     destroy() {
+      if (!active) return;
+      active = false;
       page.destroy();
       menu.destroy();
       announcer.destroy();

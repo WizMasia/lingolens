@@ -94,6 +94,48 @@ describe("translation engine", () => {
     expect(adapter.detect).not.toHaveBeenCalled();
   });
 
+  it("reuses known automatic evidence without invoking detection", async () => {
+    const adapter = makeAdapter({ detectedLanguage: "de" });
+    const engine = createTranslationEngine(adapter);
+
+    const result = await engine.translate({
+      text: "Hello",
+      source: {
+        kind: "auto",
+        knownDetection: {
+          kind: "detected",
+          language: "en",
+          provenance: "chrome-i18n",
+        },
+      },
+      target: "ko",
+    });
+
+    expect(result).toMatchObject({ sourceLanguage: "en", provenance: "chrome-i18n" });
+    expect(adapter.detect).not.toHaveBeenCalled();
+  });
+
+  it("keeps a valid language hint ahead of known automatic evidence", async () => {
+    const adapter = makeAdapter();
+    const engine = createTranslationEngine(adapter);
+
+    const result = await engine.translate({
+      text: "Bonjour",
+      source: {
+        kind: "auto",
+        languageHint: "fr",
+        knownDetection: {
+          kind: "detected",
+          language: "en",
+          provenance: "language-detector",
+        },
+      },
+      target: "ko",
+    });
+
+    expect(result).toMatchObject({ sourceLanguage: "fr", provenance: "lang" });
+  });
+
   it("returns unknown source when detector confidence is below threshold", async () => {
     // Given
     const adapter = makeAdapter({ confidence: 0.59 });

@@ -1,6 +1,7 @@
 import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
 import type {
+  AutomaticDetectionEvidence,
   DetectionProvenance,
   SourceDetection,
   SourceDetectionRequest,
@@ -9,6 +10,7 @@ import { createSourceDetector } from "./source-detection";
 import { createTranslatorCache } from "./translator-cache";
 
 export type {
+  AutomaticDetectionEvidence,
   DetectionProvenance,
   SourceDetection,
   SourceDetectionRequest,
@@ -40,7 +42,11 @@ export type AiAdapter = Readonly<{
 }>;
 
 type AutomaticSource = Extract<SourcePreference, { readonly kind: "auto" }> &
-  Readonly<{ languageHint?: string; context?: string }>;
+  Readonly<{
+    languageHint?: string;
+    context?: string;
+    knownDetection?: AutomaticDetectionEvidence;
+  }>;
 
 export type TranslationRequest = Readonly<{
   text: string;
@@ -191,7 +197,12 @@ const requestKey = (request: TranslationRequest): string => {
   const source =
     request.source.kind === "fixed"
       ? ["fixed", request.source.language]
-      : ["auto", request.source.languageHint ?? "", request.source.context ?? ""];
+      : [
+          "auto",
+          request.source.languageHint ?? "",
+          request.source.context ?? "",
+          request.source.knownDetection ?? null,
+        ];
   return JSON.stringify([source, request.target, request.text]);
 };
 

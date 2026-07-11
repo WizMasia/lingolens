@@ -1,5 +1,5 @@
 import type { Settings } from "../shared/settings";
-import type { TranslationEngine } from "./ai-engine";
+import type { SourceDetection, TranslationEngine } from "./ai-engine";
 import type { ElementMenuSelection } from "./element-menu";
 import type { ElementRecord, RecordStore } from "./records";
 import { sourceDetectionRequest, sourceRecordText } from "./translation-attempt";
@@ -10,6 +10,13 @@ export type ElementMenuInspection = Readonly<{
   settings: Settings;
   store: RecordStore;
 }>;
+
+type PendingInspection = Readonly<{
+  fingerprint: string;
+  detection: Promise<SourceDetection>;
+}>;
+
+const pendingInspections = new WeakMap<ElementRecord, PendingInspection>();
 
 export const inspectMenuSelection = (
   inspection: ElementMenuInspection,
@@ -28,9 +35,22 @@ const inspectAutomaticSource = async (
 ): Promise<ElementMenuSelection> => {
   const { engine, record, settings, store } = inspection;
   const fingerprint = record.source.textContent ?? "";
-  const detection = await engine.detectSource(
-    sourceDetectionRequest(record.source, sourceRecordText(record)),
-  );
+  const existing = pendingInspections.get(record);
+  const detectionPromise =
+    existing?.fingerprint === fingerprint
+      ? existing.detection
+      : engine.detectSource(sourceDetectionRequest(record.source, sourceRecordText(record)));
+  if (existing?.fingerprint !== fingerprint) {
+    pendingInspections.set(record, { fingerprint, detection: detectionPromise });
+  }
+  let detection: SourceDetection;
+  try {
+    detection = await detectionPromise;
+  } finally {
+    if (pendingInspections.get(record)?.detection === detectionPromise) {
+      pendingInspections.delete(record);
+    }
+  }
   if (
     store.has(record) &&
     record.source.isConnected &&

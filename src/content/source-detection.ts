@@ -14,6 +14,12 @@ export type SourceDetection =
   | Readonly<{ kind: "detected"; language: string; provenance: DetectionProvenance }>
   | Readonly<{ kind: "needs-confirmation" }>;
 
+export type AutomaticDetectionEvidence = Readonly<{
+  kind: "detected";
+  language: string;
+  provenance: Exclude<DetectionProvenance, "user">;
+}>;
+
 export type SourceDetectionRequest = Pick<TranslationRequest, "text" | "source">;
 
 export type SourceDetector = (request: SourceDetectionRequest) => Promise<SourceDetection>;
@@ -62,6 +68,12 @@ export const createSourceDetector =
 
     const hint = normalizeLanguage(request.source.languageHint ?? "");
     if (hint !== undefined) return detected(hint, "lang");
+
+    const known = request.source.knownDetection;
+    const knownLanguage = normalizeLanguage(known?.language ?? "");
+    if (known !== undefined && knownLanguage !== undefined) {
+      return detected(knownLanguage, known.provenance);
+    }
 
     const candidates = new Set<string>();
     const primary = primaryEvidence((await attempt(() => adapter.detect(request.text))) ?? []);

@@ -43,15 +43,16 @@ export const createPageController = (dependencies: PageControllerDependencies): 
     dependencies.onState(next);
   };
 
-  const reset = (notify: boolean): void => {
+  const reset = (notify: boolean, preserveDetection: boolean): void => {
     activeJob?.abort();
     activeJob = null;
     records.disconnect();
-    dependencies.store.clear();
+    if (preserveDetection) dependencies.store.restoreAllTranslations();
+    else dependencies.store.clear();
     if (notify) publish(IDLE_STATE);
   };
 
-  const restorePage = (): void => reset(true);
+  const restorePage = (): void => reset(true, true);
 
   const run = async (job: AbortController): Promise<void> => {
     if (job.signal.aborted) return;
@@ -88,7 +89,7 @@ export const createPageController = (dependencies: PageControllerDependencies): 
       records.sync();
     },
     destroy() {
-      reset(false);
+      reset(false, false);
     },
   };
 };

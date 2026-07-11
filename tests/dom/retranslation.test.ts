@@ -1,5 +1,5 @@
 import { Window } from "happy-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   TranslationEngine,
   TranslationRequest,
@@ -431,6 +431,71 @@ describe("per-element retranslation", () => {
     expect(inlineText()).toContain("안녕하세요");
     expect(announcements).toEqual(["원문 언어를 확인할 수 없습니다."]);
     expect(notices).toEqual([]);
+    expect(controller.store.getOrCreate(source).languageOverride?.source).toBe("auto");
+  });
+
+  it("retains a fixed source choice when retranslation fails", async () => {
+    const source = sourceFixture();
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "user" };
+      },
+      async translate() {
+        throw new TranslationError("translation-failed", "fixture");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    await controller.retranslate(source, { source: "en", target: "ja" });
+
+    expect(controller.store.getOrCreate(source).languageOverride).toEqual({
+      source: "en",
+      target: "ja",
+    });
+    expect(controller.store.getOrCreate(source).detection).toEqual({
+      kind: "user-selected",
+      language: "en",
+    });
+  });
+
+  it("does not open the menu or reject unhandled when destroyed during action inspection", async () => {
+    const source = sourceFixture();
+    let rejectDetection: (error: TranslationError) => void = () => undefined;
+    const pendingDetection = new Promise<never>((_resolve, reject) => {
+      rejectDetection = reject;
+    });
+    const open = vi.fn<ElementMenu["open"]>().mockResolvedValue({ kind: "cancel" });
+    const menu: ElementMenu = { open, announce() {}, destroy() {} };
+    const engine: TranslationEngine = {
+      detectSource: () => pendingDetection,
+      async translate() {
+        return result("안녕하세요", "ko");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {
+        rejectDetection(new TranslationError("api-unavailable", "destroyed"));
+      },
+    };
+    const controller = createTranslationController({ document, engine, menu, settings: SETTINGS });
+    await controller.translateTarget(source);
+    controller.store.getOrCreate(source).setDetection({ kind: "not-detected" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
+    const button =
+      host === null ? undefined : shadowRoots.get(host)?.querySelector<HTMLButtonElement>("button");
+    if (button === undefined || button === null) throw new TypeError("Action fixture unavailable");
+
+    button.click();
+    controller.destroy();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("restores the element and clears its language override", async () => {

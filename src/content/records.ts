@@ -1,6 +1,8 @@
 import type { DetectionProvenance } from "./source-detection";
 import { collectSourceTextNodes } from "./targets";
 
+export { createRecordStore } from "./record-store";
+
 export const RECORD_PHASES = [
   "idle",
   "queued",
@@ -171,6 +173,15 @@ export class ElementRecord {
     this.#onPhaseChange(this);
   }
 
+  deactivateTranslation(): void {
+    this.#attemptVersion += 1;
+    this.restoreView("remove");
+    this.#phase = "idle";
+    this.#lastSuccess = null;
+    this.#error = null;
+    this.#onPhaseChange(this);
+  }
+
   setLanguageOverride(override: ElementLanguageOverride | null): void {
     this.#languageOverride = override;
     if (override !== null && override.source !== "auto") {
@@ -236,47 +247,11 @@ export type RecordStore = Readonly<{
   has(record: ElementRecord): boolean;
   active: ReadonlySet<ElementRecord>;
   markStale(record: ElementRecord): void;
+  restoreTranslation(source: HTMLElement): void;
+  restoreAllTranslations(): void;
   remove(source: HTMLElement): void;
   clear(): void;
 }>;
-
-export const createRecordStore = (): RecordStore => {
-  let records = new WeakMap<HTMLElement, ElementRecord>();
-  const active = new Set<ElementRecord>();
-  const onPhaseChange = (record: ElementRecord): void => {
-    if (record.lastSuccess !== null || record.phase === "translated") active.add(record);
-  };
-
-  return {
-    active,
-    getOrCreate(source) {
-      const existing = records.get(source);
-      if (existing !== undefined) return existing;
-      const record = new ElementRecord(source, onPhaseChange);
-      records.set(source, record);
-      return record;
-    },
-    has(record) {
-      return records.get(record.source) === record;
-    },
-    markStale(record) {
-      record.restoreView("stale");
-      if (record.phase !== "stale") record.transition("stale");
-    },
-    remove(source) {
-      const record = records.get(source);
-      if (record === undefined) return;
-      record.restoreView("remove");
-      active.delete(record);
-      records.delete(source);
-    },
-    clear() {
-      for (const record of active) record.restoreView("clear");
-      active.clear();
-      records = new WeakMap<HTMLElement, ElementRecord>();
-    },
-  };
-};
 
 const snapshotText = (source: HTMLElement): readonly TextSnapshot[] => {
   return collectSourceTextNodes(source).map((node) => ({ node, value: node.data }));

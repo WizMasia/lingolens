@@ -133,6 +133,37 @@ describe("element menu source inspection", () => {
     expect(controller.store.getOrCreate(source).detection).toEqual({ kind: "not-detected" });
   });
 
+  it("coalesces concurrent inspection for an unchanged source", async () => {
+    const source = document.createElement("p");
+    source.textContent = "Hello";
+    document.body.append(source);
+    const detection = deferredDetection();
+    const detectSource = vi.fn().mockReturnValue(detection.promise);
+    const menu: ElementMenu = {
+      async open(): Promise<ElementMenuResult> {
+        return { kind: "cancel" };
+      },
+      announce() {},
+      destroy() {},
+    };
+    const engine: TranslationEngine = {
+      detectSource,
+      translate: vi.fn(),
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, menu, settings });
+
+    const first = controller.openElementMenu(source);
+    const second = controller.openElementMenu(source);
+    detection.resolve({ kind: "detected", language: "en", provenance: "language-detector" });
+    await Promise.all([first, second]);
+
+    expect(detectSource).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the same normalized eligible source text as translation", async () => {
     const source = document.createElement("p");
     source.append("  Hello\n ", document.createElement("code"), " world  ");
@@ -166,7 +197,7 @@ describe("element menu source inspection", () => {
     });
   });
 
-  it("returns a fresh not-detected record after restoring an element", () => {
+  it("retains automatic provenance after restoring an element", () => {
     const source = document.createElement("p");
     source.textContent = "Hello";
     document.body.append(source);
@@ -179,17 +210,21 @@ describe("element menu source inspection", () => {
       destroy() {},
     };
     const controller = createTranslationController({ document, engine, settings });
-    const staleRecord = controller.store.getOrCreate(source);
-    staleRecord.setDetection({
+    const record = controller.store.getOrCreate(source);
+    record.setDetection({
       kind: "detected",
       language: "en",
       provenance: "language-detector",
     });
 
     controller.restoreElement(source);
-    const freshRecord = controller.store.getOrCreate(source);
+    const restoredRecord = controller.store.getOrCreate(source);
 
-    expect(freshRecord).not.toBe(staleRecord);
-    expect(freshRecord.detection).toEqual({ kind: "not-detected" });
+    expect(restoredRecord).toBe(record);
+    expect(restoredRecord.detection).toEqual({
+      kind: "detected",
+      language: "en",
+      provenance: "language-detector",
+    });
   });
 });

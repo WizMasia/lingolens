@@ -1,6 +1,7 @@
 import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
 import {
+  type AutomaticDetectionEvidence,
   type DetectionProvenance,
   type SourceDetectionRequest,
   type TranslationEngine,
@@ -47,7 +48,7 @@ export const executeTranslation = async (
   record.transition("translating");
   try {
     const result = await runtime.engine.translate(
-      translationRequest(attempt, sourceRecordText(record)),
+      translationRequest(attempt, record, sourceRecordText(record)),
     );
     if (!runtime.store.has(record) || !record.isCurrentAttempt(attemptVersion)) return false;
     if (attempt.signal?.aborted === true) {
@@ -93,16 +94,24 @@ const restoreCancelledAttempt = (
   );
 };
 
-const translationRequest = (attempt: TranslationAttempt, text: string): TranslationRequest => {
+const translationRequest = (
+  attempt: TranslationAttempt,
+  record: ElementRecord,
+  text: string,
+): TranslationRequest => {
   if (attempt.preference.kind === "fixed") {
     return { text, source: attempt.preference, target: attempt.target };
   }
-  return { ...sourceDetectionRequest(attempt.source, text), target: attempt.target };
+  return {
+    ...sourceDetectionRequest(attempt.source, text, automaticEvidence(record)),
+    target: attempt.target,
+  };
 };
 
 export const sourceDetectionRequest = (
   source: HTMLElement,
   text: string,
+  knownDetection?: AutomaticDetectionEvidence,
 ): SourceDetectionRequest => {
   const languageHint = nearestLanguage(source);
   const context = nearbyContext(source, text);
@@ -112,7 +121,18 @@ export const sourceDetectionRequest = (
       kind: "auto",
       ...(languageHint === undefined ? {} : { languageHint }),
       ...(context.length === 0 ? {} : { context }),
+      ...(knownDetection === undefined ? {} : { knownDetection }),
     },
+  };
+};
+
+const automaticEvidence = (record: ElementRecord): AutomaticDetectionEvidence | undefined => {
+  const detection = record.detection;
+  if (detection.kind !== "detected" || detection.provenance === "user") return undefined;
+  return {
+    kind: "detected",
+    language: detection.language,
+    provenance: detection.provenance,
   };
 };
 
@@ -132,7 +152,7 @@ const commitResult = (commit: ResultCommit): boolean => {
       return true;
     case "skipped":
       record.setDetection(detectionState(result.sourceLanguage, result.provenance));
-      runtime.store.remove(record.source);
+      runtime.store.restoreTranslation(record.source);
       return false;
     case "unknown-source":
       record.setDetection({ kind: "needs-confirmation" });

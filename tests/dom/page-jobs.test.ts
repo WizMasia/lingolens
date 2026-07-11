@@ -175,6 +175,39 @@ describe("full-page controller", () => {
     expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
   });
 
+  it("retains automatic detection evidence across full-page restoration", async () => {
+    const [source] = addSources("One");
+    if (source === undefined) throw new TypeError("Fixture source unavailable");
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.translatePage();
+
+    controller.restorePage();
+    await controller.translatePage();
+
+    expect(requests[1]?.source).toMatchObject({
+      kind: "auto",
+      knownDetection: {
+        kind: "detected",
+        language: "en",
+        provenance: "language-detector",
+      },
+    });
+  });
+
   it("does not publish tab state while the content app is shutting down", () => {
     const states: string[] = [];
     const engine: TranslationEngine = {

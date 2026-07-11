@@ -29,6 +29,8 @@ export type LiveChatStateStore = Readonly<{
   setEnabled(tabId: number, enabled: boolean): Promise<void>;
 }>;
 
+type PageActionMessage = Extract<RuntimeMessage, { type: "translate-page" | "restore-page" }>;
+
 export type BackgroundCoordinator = Readonly<{
   receive(
     value: unknown,
@@ -61,6 +63,26 @@ export const createBackgroundCoordinator = (
     );
     return queued;
   };
+  const startPageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
+    invalidateLiveChatReplay(tab.id);
+    await dependencies.liveChatState.setEnabled(tab.id, true);
+    if (!isTopLiveChat(tab)) {
+      try {
+        await dependencies.sendToTop(tab.id, message);
+      } catch (error: unknown) {
+        invalidateLiveChatReplay(tab.id);
+        await dependencies.liveChatState.setEnabled(tab.id, false);
+        throw error;
+      }
+    }
+    dependencies.sendToLiveChat(tab.id, { type: "start-live-chat" });
+  };
+  const restorePageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
+    invalidateLiveChatReplay(tab.id);
+    await dependencies.liveChatState.setEnabled(tab.id, false);
+    if (!isTopLiveChat(tab)) await dependencies.sendToTop(tab.id, message);
+    dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
+  };
   return {
     async receive(value, senderTabId, senderFrameId) {
       const message = parseMessage(value);
@@ -89,29 +111,15 @@ export const createBackgroundCoordinator = (
           dependencies.broadcastSettings();
           return undefined;
         case "translate-page": {
-          await queuePageAction(async () => {
-            const tab = await dependencies.activeTab();
-            if (tab === undefined) return;
-            invalidateLiveChatReplay(tab.id);
-            await dependencies.liveChatState.setEnabled(tab.id, true);
-            if (!isTopLiveChat(tab)) {
-              await dependencies.sendToTop(tab.id, message);
-            }
-            dependencies.sendToLiveChat(tab.id, { type: "start-live-chat" });
-          });
+          const tab = await dependencies.activeTab();
+          if (tab === undefined) return undefined;
+          await queuePageAction(() => startPageAction(tab, message));
           return undefined;
         }
         case "restore-page": {
-          await queuePageAction(async () => {
-            const tab = await dependencies.activeTab();
-            if (tab === undefined) return;
-            invalidateLiveChatReplay(tab.id);
-            await dependencies.liveChatState.setEnabled(tab.id, false);
-            if (!isTopLiveChat(tab)) {
-              await dependencies.sendToTop(tab.id, message);
-            }
-            dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
-          });
+          const tab = await dependencies.activeTab();
+          if (tab === undefined) return undefined;
+          await queuePageAction(() => restorePageAction(tab, message));
           return undefined;
         }
         case "start-live-chat":

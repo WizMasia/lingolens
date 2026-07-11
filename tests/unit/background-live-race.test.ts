@@ -152,4 +152,69 @@ describe("background live replay races", () => {
     await expect(restore).resolves.toBeUndefined();
     expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "stop-live-chat" });
   });
+
+  it("rolls back live intent when generic start dispatch fails", async () => {
+    // Given
+    const liveChatState = createLiveChatState();
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockRejectedValue(new Error("top frame unavailable")),
+      sendToLiveChat,
+      liveChatState,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    await expect(coordinator.receive({ type: "translate-page" })).rejects.toThrow(
+      "top frame unavailable",
+    );
+    await coordinator.liveChatEndpointRegistered(7);
+
+    // Then
+    expect(await liveChatState.isEnabled(7)).toBe(false);
+    expect(sendToLiveChat).not.toHaveBeenCalledWith(7, { type: "start-live-chat" });
+  });
+
+  it("captures the restore tab before its queued action executes", async () => {
+    // Given
+    const startWrite = deferred<void>();
+    const startWriteStarted = deferred<void>();
+    let tabId = 7;
+    const writes: (readonly [number, boolean])[] = [];
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: tabId, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat: vi.fn(),
+      liveChatState: {
+        async isEnabled() {
+          return false;
+        },
+        async setEnabled(nextTabId, enabled) {
+          writes.push([nextTabId, enabled]);
+          if (enabled) {
+            startWriteStarted.resolve();
+            await startWrite.promise;
+          }
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    await startWriteStarted.promise;
+    const restore = coordinator.receive({ type: "restore-page" });
+    tabId = 8;
+    startWrite.resolve();
+    await Promise.all([start, restore]);
+
+    // Then
+    expect(writes).toEqual([
+      [7, true],
+      [7, false],
+    ]);
+  });
 });

@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 const pngSize = async (path: string): Promise<readonly [number, number]> => {
   const bytes = await readFile(path);
+  expect(Array.from(bytes.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  expect(new TextDecoder().decode(bytes.subarray(12, 16))).toBe("IHDR");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return [view.getUint32(16), view.getUint32(20)];
 };
@@ -15,6 +17,10 @@ describe("LingoLens static assets", () => {
     };
     expect(manifest.name).toBe("LingoLens");
     expect(manifest.action.default_title).toBe("LingoLens");
+    await expect(readFile("src/icons/lingolens.svg", "utf8")).resolves.toContain("<svg");
+    const options = await readFile("src/options/options.html", "utf8");
+    expect(options).toContain("LingoLens");
+    expect(options).not.toContain("Local Page Translator");
     await expect(pngSize("src/icons/icon-16.png")).resolves.toEqual([16, 16]);
     await expect(pngSize("src/icons/icon-32.png")).resolves.toEqual([32, 32]);
     await expect(pngSize("src/icons/icon-48.png")).resolves.toEqual([48, 48]);

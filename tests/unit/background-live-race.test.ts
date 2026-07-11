@@ -424,4 +424,40 @@ describe("background live replay races", () => {
     // Then
     expect(sendToLiveChat).not.toHaveBeenCalledWith(7, { type: "start-live-chat" });
   });
+
+  it("keeps a queued start when another tab closes", async () => {
+    // Given
+    const firstSend = deferred<void>();
+    const firstSendStarted = deferred<void>();
+    const sendToLiveChat = vi.fn();
+    let activeTabCalls = 0;
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => {
+        activeTabCalls += 1;
+        return activeTabCalls === 1
+          ? { id: 9, url: undefined }
+          : { id: 8, url: "https://www.youtube.com/live_chat?v=fixture" };
+      },
+      sendToTop(tabId) {
+        if (tabId !== 9) return Promise.resolve();
+        firstSendStarted.resolve();
+        return firstSend.promise;
+      },
+      sendToLiveChat,
+      liveChatState: createLiveChatState(),
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const first = coordinator.receive({ type: "translate-page" });
+    await firstSendStarted.promise;
+    const second = coordinator.receive({ type: "translate-page" });
+    coordinator.removeTab(7);
+    firstSend.resolve();
+    await Promise.all([first, second]);
+
+    // Then
+    expect(sendToLiveChat).toHaveBeenCalledWith(8, { type: "start-live-chat" });
+  });
 });

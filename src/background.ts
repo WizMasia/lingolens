@@ -48,7 +48,8 @@ export const createBackgroundCoordinator = (
   const states = new Map<number, TabState>();
   const liveChatIntent = createLiveChatIntentTracker();
   let pageActionQueue: Promise<void> = Promise.resolve();
-  let pageLifecycleEpoch = 0;
+  const tabLifecycleEvents = new Map<number, number>();
+  let lifecycleEvent = 0;
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
   const isTopLiveChat = (tab: ActiveTab): boolean =>
     hasTopLiveChat(tab.id) || isYouTubeLiveChatUrl(tab.url ?? "");
@@ -83,14 +84,13 @@ export const createBackgroundCoordinator = (
     dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
   };
   const clearLiveChatIntent = (tabId: number, forget: boolean): void => {
-    pageLifecycleEpoch += 1;
+    lifecycleEvent += 1;
+    tabLifecycleEvents.set(tabId, lifecycleEvent);
     states.delete(tabId);
     const generation = liveChatIntent.disable(tabId);
     void queuePageAction(async () => {
       await dependencies.liveChatState.setEnabled(tabId, false);
-      if (forget && generation === liveChatIntent.generation(tabId)) {
-        liveChatIntent.forgetIfCurrent(tabId, generation);
-      }
+      if (forget) liveChatIntent.forgetIfCurrent(tabId, generation);
     });
   };
   return {
@@ -121,23 +121,31 @@ export const createBackgroundCoordinator = (
           dependencies.broadcastSettings();
           return undefined;
         case "translate-page": {
-          const lifecycleEpoch = pageLifecycleEpoch;
+          const actionEvent = lifecycleEvent;
           const tab = dependencies.activeTab();
           await queuePageAction(async () => {
-            if (lifecycleEpoch !== pageLifecycleEpoch) return;
             const descriptor = await tab;
-            if (descriptor === undefined || lifecycleEpoch !== pageLifecycleEpoch) return;
+            if (
+              descriptor === undefined ||
+              (tabLifecycleEvents.get(descriptor.id) ?? 0) > actionEvent
+            ) {
+              return;
+            }
             await startPageAction(descriptor, message);
           });
           return undefined;
         }
         case "restore-page": {
-          const lifecycleEpoch = pageLifecycleEpoch;
+          const actionEvent = lifecycleEvent;
           const tab = dependencies.activeTab();
           await queuePageAction(async () => {
-            if (lifecycleEpoch !== pageLifecycleEpoch) return;
             const descriptor = await tab;
-            if (descriptor === undefined || lifecycleEpoch !== pageLifecycleEpoch) return;
+            if (
+              descriptor === undefined ||
+              (tabLifecycleEvents.get(descriptor.id) ?? 0) > actionEvent
+            ) {
+              return;
+            }
             await restorePageAction(descriptor, message);
           });
           return undefined;

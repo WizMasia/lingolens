@@ -72,7 +72,12 @@ export const createYouTubeLiveChatSession = (
     const complete = (): void => {
       if (activeAbortController === controller) activeAbortController = undefined;
       processing = false;
-      if (active && generation === entryGeneration) processQueue();
+      if (!active) return;
+      if (generation !== entryGeneration) {
+        processQueue();
+        return;
+      }
+      processQueue();
     };
     void dependencies.translate(entry.source, controller.signal).then(complete, complete);
   };

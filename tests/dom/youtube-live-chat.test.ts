@@ -155,4 +155,30 @@ describe("YouTube live chat", () => {
 
     expect(translated).toEqual(["First"]);
   });
+
+  it("resumes queued work after an in-flight stopped generation completes", async () => {
+    const items = chatFixture();
+    items.append(messageRenderer("First"));
+    const translated: string[] = [];
+    const first = deferred<void>();
+    const session = createYouTubeLiveChatSession({
+      document,
+      translate(source) {
+        const text = collectSourceText(source);
+        translated.push(text);
+        return text === "First" ? first.promise : Promise.resolve();
+      },
+    });
+
+    await session.start();
+    await flushMutations();
+    session.stop();
+    await session.start();
+    items.append(messageRenderer("Second"));
+    await flushMutations();
+    first.resolve();
+    await flushMutations();
+
+    expect(translated).toEqual(["First", "Second"]);
+  });
 });

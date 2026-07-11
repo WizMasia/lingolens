@@ -27,7 +27,7 @@ describe("background coordinator", () => {
   it("stores tab state and returns it for the active tab", async () => {
     const broadcast = vi.fn();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
@@ -39,9 +39,9 @@ describe("background coordinator", () => {
   });
 
   it("returns idle for an unknown tab and forgets removed tabs", async () => {
-    let activeTab = 8;
+    let activeTabId = 8;
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => activeTab,
+      activeTab: async () => ({ id: activeTabId, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
@@ -51,14 +51,14 @@ describe("background coordinator", () => {
     coordinator.receive({ type: "tab-state", state: complete }, 8, 0);
     coordinator.removeTab(8);
     expect(await coordinator.receive({ type: "get-tab-state" })).toMatchObject({ phase: "idle" });
-    activeTab = 9;
+    activeTabId = 9;
     expect(await coordinator.receive({ type: "get-tab-state" })).toMatchObject({ phase: "idle" });
   });
 
   it("broadcasts settings changes", () => {
     const broadcast = vi.fn();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => undefined,
+      activeTab: async () => undefined,
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
@@ -72,7 +72,7 @@ describe("background coordinator", () => {
   it("recovers live state from the active content script after a worker restart", async () => {
     const requestTabState = vi.fn().mockResolvedValue(complete);
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
@@ -87,7 +87,7 @@ describe("background coordinator", () => {
   it("does not let a child frame overwrite top-frame tab state", async () => {
     const childState: TabState = { ...complete, phase: "translating", completed: 1 };
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
@@ -106,7 +106,7 @@ describe("background coordinator", () => {
     const sendToLiveChat = vi.fn();
     const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop,
       sendToLiveChat,
       liveChatState,
@@ -125,7 +125,7 @@ describe("background coordinator", () => {
     const sendToLiveChat = vi.fn();
     const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop,
       sendToLiveChat,
       liveChatState,
@@ -144,7 +144,7 @@ describe("background coordinator", () => {
     const sendToLiveChat = vi.fn();
     const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop,
       sendToLiveChat,
       liveChatState,
@@ -165,7 +165,7 @@ describe("background coordinator", () => {
     // Given
     const liveChatState = createLiveChatState();
     const first = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState,
@@ -175,7 +175,7 @@ describe("background coordinator", () => {
     await first.receive({ type: "translate-page" });
     const sendToLiveChat = vi.fn();
     const restarted = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat,
       liveChatState,
@@ -194,7 +194,7 @@ describe("background coordinator", () => {
     // Given
     const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState,
@@ -205,7 +205,7 @@ describe("background coordinator", () => {
     await coordinator.receive({ type: "restore-page" });
     const sendToLiveChat = vi.fn();
     const restarted = createBackgroundCoordinator({
-      activeTabId: async () => 7,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat,
       liveChatState,
@@ -226,8 +226,10 @@ describe("background coordinator", () => {
     const sendToTop = vi.fn().mockResolvedValue(undefined);
     const sendToLiveChat = vi.fn();
     const coordinator = createBackgroundCoordinator({
-      activeTabId: async () => 7,
-      activeTabUrl: async () => "https://www.youtube.com/live_chat?v=fixture",
+      activeTab: async () => ({
+        id: 7,
+        url: "https://www.youtube.com/live_chat?v=fixture",
+      }),
       sendToTop,
       sendToLiveChat,
       liveChatState,

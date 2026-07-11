@@ -133,6 +133,47 @@ describe("element menu source inspection", () => {
     expect(controller.store.getOrCreate(source).detection).toEqual({ kind: "not-detected" });
   });
 
+  it("refreshes source text changed before menu inspection", async () => {
+    const source = document.createElement("p");
+    source.textContent = "Hello";
+    document.body.append(source);
+    const detectSource = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "fr",
+      provenance: "language-detector",
+    });
+    const menu: ElementMenu = {
+      async open(): Promise<ElementMenuResult> {
+        return { kind: "cancel" };
+      },
+      announce() {},
+      destroy() {},
+    };
+    const engine: TranslationEngine = {
+      detectSource,
+      translate: vi.fn(),
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, menu, settings });
+    const record = controller.store.getOrCreate(source);
+    source.textContent = " Bonjour ";
+
+    await controller.openElementMenu(source);
+
+    expect(detectSource).toHaveBeenCalledWith({
+      text: "Bonjour",
+      source: { kind: "auto" },
+    });
+    expect(record.detection).toEqual({
+      kind: "detected",
+      language: "fr",
+      provenance: "language-detector",
+    });
+  });
+
   it("coalesces concurrent inspection for an unchanged source", async () => {
     const source = document.createElement("p");
     source.textContent = "Hello";

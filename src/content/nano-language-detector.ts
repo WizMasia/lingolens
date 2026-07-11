@@ -10,6 +10,27 @@ export type NanoLanguageDetector = Readonly<{
 
 export type NanoLanguageResponseSource = (text: string, context: string) => Promise<string>;
 
+export type NanoPreparation = Readonly<{
+  prepare(onProgress: (loaded: number) => void): Promise<"ready" | "unavailable">;
+}>;
+
+type NanoAvailability = "unavailable" | "downloadable" | "downloading" | "available";
+
+type NanoPreparationMonitor = Readonly<{
+  addEventListener(type: "downloadprogress", listener: (event: ProgressEvent) => void): void;
+}>;
+
+type NanoPreparationCreateOptions = Readonly<{
+  monitor?(monitor: NanoPreparationMonitor): void;
+}>;
+
+type NanoPreparationModel = Readonly<{ destroy(): void }>;
+
+export type NanoPreparationApi = Readonly<{
+  availability(): Promise<NanoAvailability>;
+  create(options: NanoPreparationCreateOptions): Promise<NanoPreparationModel>;
+}>;
+
 const MINIMUM_CONFIDENCE = 0.8;
 const SUPPORTED_LANGUAGES = new Set(LANGUAGE_CHOICES.map(({ value }) => value));
 
@@ -22,6 +43,37 @@ export const createNanoLanguageDetector = (
     return parseNanoLanguageDecision(await request(text, context));
   },
 });
+
+export const createNanoPreparation = (
+  api: NanoPreparationApi | undefined = nativeNanoPreparationApi(),
+): NanoPreparation => ({
+  async prepare(onProgress) {
+    if (api === undefined) return "unavailable";
+    try {
+      if ((await api.availability()) === "unavailable") return "unavailable";
+      const model = await api.create({
+        monitor(monitor) {
+          monitor.addEventListener("downloadprogress", (event) => {
+            if (event.total <= 0) return;
+            onProgress(Math.min(1, Math.max(0, event.loaded / event.total)));
+          });
+        },
+      });
+      model.destroy();
+      return "ready";
+    } catch {
+      return "unavailable";
+    }
+  },
+});
+
+const nativeNanoPreparationApi = (): NanoPreparationApi | undefined => {
+  if (!("LanguageModel" in globalThis)) return undefined;
+  return {
+    availability: () => LanguageModel.availability(),
+    create: (options) => LanguageModel.create(options),
+  };
+};
 
 const parseNanoLanguageDecision = (response: string): NanoLanguageDecision => {
   try {

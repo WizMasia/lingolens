@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { createLiveChatLanguageMemory } from "../../src/content/live-chat-language-memory";
 import {
   createNanoLanguageDetector,
+  createNanoPreparation,
   type NanoLanguageResponseSource,
+  type NanoPreparationApi,
 } from "../../src/content/nano-language-detector";
 
 const fakeNano = (reply: string): NanoLanguageResponseSource => vi.fn().mockResolvedValue(reply);
@@ -34,6 +36,42 @@ describe("Nano language detector", () => {
 
     // Then
     await expect(decision).resolves.toEqual({ kind: "unavailable" });
+  });
+});
+
+describe("Nano preparation", () => {
+  it("creates and releases a downloadable local model only when explicitly prepared", async () => {
+    // Given
+    const destroy = vi.fn();
+    const create = vi.fn<NanoPreparationApi["create"]>().mockResolvedValue({ destroy });
+    const preparation = createNanoPreparation({
+      availability: async () => "downloadable",
+      create,
+    });
+
+    // When
+    const result = await preparation.prepare(vi.fn());
+
+    // Then
+    expect(result).toBe("ready");
+    expect(create).toHaveBeenCalledOnce();
+    expect(destroy).toHaveBeenCalledOnce();
+  });
+
+  it("does not create a model when Nano is unavailable", async () => {
+    // Given
+    const create = vi.fn<NanoPreparationApi["create"]>();
+    const preparation = createNanoPreparation({
+      availability: async () => "unavailable",
+      create,
+    });
+
+    // When
+    const result = await preparation.prepare(vi.fn());
+
+    // Then
+    expect(result).toBe("unavailable");
+    expect(create).not.toHaveBeenCalled();
   });
 });
 

@@ -35,6 +35,11 @@
           <div class="trigger-control"><button type="button" id="menu-trigger-capture" class="button secondary-button" aria-label="언어 메뉴 키 변경">키 변경</button><output id="menu-trigger-value" class="keycap" aria-label="현재 언어 메뉴 키" aria-live="polite">Ctrl + Shift</output></div>
           <p id="menu-trigger-warning" class="secondary" aria-live="polite"></p>
         </section>
+        <section class="nano-section" aria-labelledby="nano-title">
+          <div><h2 id="nano-title">라이브 채팅 언어 보조 (실험 기능)</h2><p>메시지는 기기에서만 처리되며, 모델은 별도로 다운로드됩니다.</p></div>
+          <label class="choice"><input type="checkbox" id="live-chat-nano" /> <span><strong>Gemini Nano 언어 보조 사용</strong><small>로마자 표기나 지원하지 않는 언어에서는 정확하지 않거나 사용할 수 없습니다.</small></span></label>
+          <div class="nano-actions"><button type="button" id="prepare-live-chat-nano" class="button secondary-button">로컬 모델 준비</button><p id="nano-status" class="secondary" role="status" aria-live="polite"></p></div>
+        </section>
         <div class="save-row"><p id="save-status" role="status" aria-live="polite"></p><button type="submit" class="button primary">설정 저장</button></div>
       </form>
     </main>

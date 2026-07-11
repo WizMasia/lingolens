@@ -17,7 +17,8 @@ form {
   gap: var(--lt-space-6);
 }
 fieldset,
-.trigger-section {
+.trigger-section,
+.nano-section {
   margin: 0;
   padding: var(--lt-space-4);
   border: var(--lt-border);
@@ -63,7 +64,15 @@ legend {
   display: grid;
   gap: var(--lt-space-3);
 }
+.nano-section {
+  display: grid;
+  gap: var(--lt-space-3);
+}
 .trigger-section h2 + p {
+  margin-block-start: var(--lt-space-1);
+  color: rgb(23 32 27 / 66%);
+}
+.nano-section h2 + p {
   margin-block-start: var(--lt-space-1);
   color: rgb(23 32 27 / 66%);
 }
@@ -82,6 +91,11 @@ legend {
 }
 .save-row {
   min-block-size: var(--lt-target-min);
+}
+.nano-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--lt-space-3);
 }
 #save-status {
   color: var(--lt-color-moss);

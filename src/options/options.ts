@@ -1,3 +1,4 @@
+import { createNanoPreparation, type NanoPreparation } from "../content/nano-language-detector";
 import { LANGUAGE_CHOICES } from "../shared/languages";
 import {
   isModifierTrigger,
@@ -22,6 +23,7 @@ export type OptionsDependencies = Readonly<{
   load(): Promise<Settings>;
   save(settings: Settings): Promise<void>;
   uiLanguage: string;
+  prepareNano?: NanoPreparation["prepare"];
 }>;
 
 export type OptionsApp = Readonly<{ ready: Promise<void> }>;
@@ -39,11 +41,15 @@ export const createOptionsApp = (
   const form = required(document, "settings-form", HTMLFormElement);
   const source = required(document, "source-language", HTMLSelectElement);
   const target = required(document, "target-language", HTMLSelectElement);
+  const liveChatNano = required(document, "live-chat-nano", HTMLInputElement);
+  const prepareNano = required(document, "prepare-live-chat-nano", HTMLButtonElement);
+  const nanoStatus = required(document, "nano-status", HTMLParagraphElement);
   const controls: Record<ShortcutKind, TriggerControls> = {
     translation: triggerControls(document, "trigger"),
     menu: triggerControls(document, "menu-trigger"),
   };
   const status = required(document, "save-status", HTMLParagraphElement);
+  const prepare = dependencies.prepareNano ?? createNanoPreparation().prepare;
   let triggers = defaultShortcuts();
   let capturing: ShortcutKind | null = null;
   let modifierCandidate: TriggerBinding | null = null;
@@ -119,7 +125,7 @@ export const createOptionsApp = (
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void dependencies
-      .save(readSettings(form, source, target, triggers, dependencies.uiLanguage))
+      .save(readSettings(form, source, target, liveChatNano, triggers, dependencies.uiLanguage))
       .then(
         () => {
           status.textContent = "설정을 저장했습니다.";
@@ -129,6 +135,13 @@ export const createOptionsApp = (
         },
       );
   });
+  prepareNano.addEventListener("click", () => {
+    void prepare((loaded) => {
+      nanoStatus.textContent = `로컬 모델 준비 중: ${Math.round(loaded * 100)}%`;
+    }).then((result) => {
+      nanoStatus.textContent = result === "ready" ? "준비됨" : "이 기기에서는 사용할 수 없습니다";
+    });
+  });
 
   const ready = dependencies.load().then((settings) => {
     triggers = { translation: settings.trigger, menu: settings.menuTrigger };
@@ -137,6 +150,7 @@ export const createOptionsApp = (
     }
     source.value = settings.source.kind === "auto" ? "auto" : settings.source.language;
     target.value = settings.target.kind === "browser" ? "browser" : settings.target.language;
+    liveChatNano.checked = settings.liveChatNanoEnabled;
     controls.translation.value.textContent = triggerLabel(triggers.translation);
     controls.menu.value.textContent = triggerLabel(triggers.menu);
   });
@@ -147,6 +161,7 @@ const readSettings = (
   form: HTMLFormElement,
   source: HTMLSelectElement,
   target: HTMLSelectElement,
+  liveChatNano: HTMLInputElement,
   triggers: ShortcutBindings,
   uiLanguage: string,
 ): Settings => {
@@ -161,6 +176,7 @@ const readSettings = (
         target.value === "browser"
           ? { kind: "browser" }
           : { kind: "fixed", language: target.value },
+      liveChatNanoEnabled: liveChatNano.checked,
       trigger: triggers.translation,
       menuTrigger: triggers.menu,
     },

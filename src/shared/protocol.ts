@@ -10,6 +10,8 @@ export type TabState = Readonly<{
 export type RuntimeMessage =
   | { readonly type: "translate-page" }
   | { readonly type: "restore-page" }
+  | { readonly type: "start-live-chat" }
+  | { readonly type: "stop-live-chat" }
   | { readonly type: "get-tab-state" }
   | { readonly type: "settings-changed" }
   | { readonly type: "tab-state"; readonly state: TabState };
@@ -76,6 +78,10 @@ export function parseMessage(value: unknown): RuntimeMessage | undefined {
       return { type: "translate-page" };
     case "restore-page":
       return { type: "restore-page" };
+    case "start-live-chat":
+      return { type: "start-live-chat" };
+    case "stop-live-chat":
+      return { type: "stop-live-chat" };
     case "get-tab-state":
       return { type: "get-tab-state" };
     case "settings-changed":

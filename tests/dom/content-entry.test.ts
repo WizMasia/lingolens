@@ -44,7 +44,13 @@ const SETTINGS: Settings = {
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };
 
-const controllerFixture = (settings: Settings = SETTINGS): TranslationController => ({
+type LiveChatController = TranslationController &
+  Readonly<{
+    startLiveChat(): Promise<void>;
+    stopLiveChat(): void;
+  }>;
+
+const controllerFixture = (settings: Settings = SETTINGS): LiveChatController => ({
   settings,
   store: {
     active: new Set(),
@@ -60,6 +66,8 @@ const controllerFixture = (settings: Settings = SETTINGS): TranslationController
   translateTarget: vi.fn().mockResolvedValue(undefined),
   translatePage: vi.fn().mockResolvedValue(undefined),
   restorePage: vi.fn(),
+  startLiveChat: vi.fn().mockResolvedValue(undefined),
+  stopLiveChat: vi.fn(),
   getState: vi
     .fn()
     .mockReturnValue({ phase: "idle", completed: 0, total: 0, skipped: 0, failed: 0 }),
@@ -202,6 +210,17 @@ describe("content entry", () => {
     expect(controller.translatePage).toHaveBeenCalledOnce();
     expect(controller.restorePage).toHaveBeenCalledOnce();
     expect(controller.applySettings).toHaveBeenCalledWith(hoverSettings);
+  });
+
+  it("routes live chat runtime commands", async () => {
+    const controller = controllerFixture();
+    const app = createTestContentApp(controller);
+
+    await app.handleMessage({ type: "start-live-chat" });
+    app.handleMessage({ type: "stop-live-chat" });
+
+    expect(controller.startLiveChat).toHaveBeenCalledOnce();
+    expect(controller.stopLiveChat).toHaveBeenCalledOnce();
   });
 
   it("provides the production controller with the full language catalog", () => {

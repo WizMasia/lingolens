@@ -15,6 +15,8 @@ describe("background coordinator", () => {
     const broadcast = vi.fn();
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
       broadcastSettings: broadcast,
       requestTabState: vi.fn(),
     });
@@ -26,6 +28,8 @@ describe("background coordinator", () => {
     let activeTab = 8;
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => activeTab,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn().mockRejectedValue(new Error("content unavailable")),
     });
@@ -40,6 +44,8 @@ describe("background coordinator", () => {
     const broadcast = vi.fn();
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => undefined,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
       broadcastSettings: broadcast,
       requestTabState: vi.fn(),
     });
@@ -51,11 +57,67 @@ describe("background coordinator", () => {
     const requestTabState = vi.fn().mockResolvedValue(complete);
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
       broadcastSettings: vi.fn(),
       requestTabState,
     });
 
     await expect(coordinator.receive({ type: "get-tab-state" })).resolves.toEqual(complete);
     expect(requestTabState).toHaveBeenCalledWith(7);
+  });
+
+  it("starts the top page and registered live chat", async () => {
+    const sendToTop = vi.fn().mockResolvedValue(undefined);
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop,
+      sendToLiveChat,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    await coordinator.receive({ type: "translate-page" });
+
+    expect(sendToTop).toHaveBeenCalledWith(7, { type: "translate-page" });
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "start-live-chat" });
+  });
+
+  it("restores the top page and stops registered live chat", async () => {
+    const sendToTop = vi.fn().mockResolvedValue(undefined);
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop,
+      sendToLiveChat,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    await coordinator.receive({ type: "restore-page" });
+
+    expect(sendToTop).toHaveBeenCalledWith(7, { type: "restore-page" });
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "stop-live-chat" });
+  });
+
+  it("uses only registered live chat commands for a top-level live chat", async () => {
+    const sendToTop = vi.fn().mockResolvedValue(undefined);
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop,
+      sendToLiveChat,
+      hasTopLiveChat: () => true,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    await coordinator.receive({ type: "translate-page" });
+    await coordinator.receive({ type: "restore-page" });
+
+    expect(sendToTop).not.toHaveBeenCalled();
+    expect(sendToLiveChat).toHaveBeenNthCalledWith(1, 7, { type: "start-live-chat" });
+    expect(sendToLiveChat).toHaveBeenNthCalledWith(2, 7, { type: "stop-live-chat" });
   });
 });

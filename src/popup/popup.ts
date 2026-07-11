@@ -115,9 +115,7 @@ if (typeof chrome !== "undefined") {
       return parseSettings(stored["settings"], chrome.i18n.getUILanguage());
     },
     async sendToActiveTab(message) {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) throw new Error("Active tab unavailable");
-      await chrome.tabs.sendMessage(tab.id, message);
+      await chrome.runtime.sendMessage(message);
     },
     openOptions() {
       void chrome.runtime.openOptionsPage();

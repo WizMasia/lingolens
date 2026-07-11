@@ -23,6 +23,11 @@ export type ContentApp = Readonly<{
   destroy(): void;
 }>;
 
+type LiveChatCommands = Readonly<{
+  startLiveChat(): Promise<void>;
+  stopLiveChat(): void;
+}>;
+
 export const productionLanguages = () => LANGUAGE_CHOICES;
 
 export const eventElement = (event: Pick<Event, "composedPath" | "target">): Element | null => {
@@ -92,6 +97,13 @@ export const createContentApp = (
       case "restore-page":
         dependencies.controller.restorePage();
         return undefined;
+      case "start-live-chat":
+        return hasLiveChatCommands(dependencies.controller)
+          ? dependencies.controller.startLiveChat()
+          : undefined;
+      case "stop-live-chat":
+        if (hasLiveChatCommands(dependencies.controller)) dependencies.controller.stopLiveChat();
+        return undefined;
       case "get-tab-state":
         return dependencies.controller.getState();
       case "settings-changed":
@@ -136,6 +148,14 @@ const matchedAction = (event: KeyboardEvent, settings: Settings): ShortcutAction
 const actionBinding = (action: ShortcutAction, settings: Settings): TriggerBinding =>
   action === "menu" ? settings.menuTrigger : settings.trigger;
 
+const hasLiveChatCommands = (
+  controller: TranslationController,
+): controller is TranslationController & LiveChatCommands =>
+  "startLiveChat" in controller &&
+  typeof controller.startLiveChat === "function" &&
+  "stopLiveChat" in controller &&
+  typeof controller.stopLiveChat === "function";
+
 const isEditable = (value: EventTarget | undefined): boolean =>
   value instanceof Element &&
   (value.matches("input, textarea, select, [contenteditable]:not([contenteditable='false'])") ||
@@ -174,6 +194,17 @@ if (typeof chrome !== "undefined") {
     });
     const app = createContentApp(document, { controller, loadSettings });
     chrome.runtime.onMessage.addListener((value: unknown) => app.handleMessage(value));
-    window.addEventListener("pagehide", () => app.destroy(), { once: true });
+    const port = chrome.runtime.connect({ name: "lingolens-frame" });
+    port.onMessage.addListener((value: unknown) => {
+      void app.handleMessage(value);
+    });
+    window.addEventListener(
+      "pagehide",
+      () => {
+        app.destroy();
+        port.disconnect();
+      },
+      { once: true },
+    );
   });
 }

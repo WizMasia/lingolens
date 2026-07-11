@@ -2,6 +2,7 @@ import { collectSourceText } from "./targets";
 
 const ITEM_LIST_SELECTOR = "yt-live-chat-item-list-renderer #items";
 const MESSAGE_SELECTOR = "yt-live-chat-text-message-renderer #message";
+const MAX_QUEUED_MESSAGES = 100;
 
 export type YouTubeLiveChatSession = Readonly<{
   start(): Promise<void>;
@@ -45,6 +46,7 @@ export const createYouTubeLiveChatSession = (
     if (!active || text.length === 0 || queuedText.get(source) === text) return;
     queuedText.set(source, text);
     queue.push({ source, text });
+    if (queue.length > MAX_QUEUED_MESSAGES) queue.shift();
     processQueue();
   };
 

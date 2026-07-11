@@ -206,7 +206,7 @@ describe("content entry", () => {
     expect(controller.applySettings).toHaveBeenCalledWith(hoverSettings);
   });
 
-  it("routes live chat runtime commands", async () => {
+  it("restores the frame when a live chat stop command arrives", async () => {
     const controller = controllerFixture();
     const app = createTestContentApp(controller);
 
@@ -214,7 +214,8 @@ describe("content entry", () => {
     app.handleMessage({ type: "stop-live-chat" });
 
     expect(controller.startLiveChat).toHaveBeenCalledOnce();
-    expect(controller.stopLiveChat).toHaveBeenCalledOnce();
+    expect(controller.restorePage).toHaveBeenCalledOnce();
+    expect(controller.stopLiveChat).not.toHaveBeenCalled();
   });
 
   it("leaves page handlers off in a child frame while routing live commands", async () => {
@@ -241,7 +242,8 @@ describe("content entry", () => {
     expect(controller.setHovered).not.toHaveBeenCalled();
     expect(controller.translateTarget).not.toHaveBeenCalled();
     expect(controller.startLiveChat).toHaveBeenCalledOnce();
-    expect(controller.stopLiveChat).toHaveBeenCalledOnce();
+    expect(controller.restorePage).toHaveBeenCalledOnce();
+    expect(controller.stopLiveChat).not.toHaveBeenCalled();
   });
 
   it("provides the production controller with the full language catalog", () => {

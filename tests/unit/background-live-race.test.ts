@@ -174,7 +174,8 @@ describe("background live replay races", () => {
 
     // Then
     expect(await liveChatState.isEnabled(7)).toBe(false);
-    expect(sendToLiveChat).not.toHaveBeenCalledWith(7, { type: "start-live-chat" });
+    expect(sendToLiveChat).toHaveBeenNthCalledWith(1, 7, { type: "start-live-chat" });
+    expect(sendToLiveChat).toHaveBeenNthCalledWith(2, 7, { type: "stop-live-chat" });
   });
 
   it("captures the restore tab before its queued action executes", async () => {
@@ -253,6 +254,105 @@ describe("background live replay races", () => {
 
     // Then
     expect(messages).toEqual(["start-live-chat", "stop-live-chat"]);
+    expect(enabled).toBe(false);
+  });
+
+  it("clears live intent when its tab closes during a queued start", async () => {
+    // Given
+    const startWrite = deferred<void>();
+    const startWriteStarted = deferred<void>();
+    let enabled = false;
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat: vi.fn(),
+      liveChatState: {
+        async isEnabled() {
+          return enabled;
+        },
+        async setEnabled(_tabId, value) {
+          if (value) {
+            startWriteStarted.resolve();
+            await startWrite.promise;
+          }
+          enabled = value;
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    await startWriteStarted.promise;
+    coordinator.removeTab(7);
+    startWrite.resolve();
+    await start;
+
+    // Then
+    expect(enabled).toBe(false);
+  });
+
+  it("starts live chat before a slow top-page translation completes", async () => {
+    // Given
+    const topTranslation = deferred<void>();
+    const topTranslationStarted = deferred<void>();
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn(() => {
+        topTranslationStarted.resolve();
+        return topTranslation.promise;
+      }),
+      sendToLiveChat,
+      liveChatState: createLiveChatState(),
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    await topTranslationStarted.promise;
+
+    // Then
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "start-live-chat" });
+    topTranslation.resolve();
+    await start;
+  });
+
+  it("clears live intent when a tab starts navigating during a queued start", async () => {
+    // Given
+    const startWrite = deferred<void>();
+    const startWriteStarted = deferred<void>();
+    let enabled = false;
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat: vi.fn(),
+      liveChatState: {
+        async isEnabled() {
+          return enabled;
+        },
+        async setEnabled(_tabId, value) {
+          if (value) {
+            startWriteStarted.resolve();
+            await startWrite.promise;
+          }
+          enabled = value;
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    await startWriteStarted.promise;
+    coordinator.navigationStarted(7);
+    startWrite.resolve();
+    await start;
+
+    // Then
     expect(enabled).toBe(false);
   });
 });

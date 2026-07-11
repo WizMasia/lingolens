@@ -1,5 +1,8 @@
 import { createFrameRegistry, type FrameEndpoint, isYouTubeLiveChatUrl } from "./frame-registry";
+import { createLiveChatStateStore, type LiveChatStateStore } from "./live-chat-state";
 import { parseMessage, type RuntimeMessage, type TabState } from "./shared/protocol";
+
+export type { LiveChatStateStore } from "./live-chat-state";
 
 const IDLE_STATE: TabState = {
   phase: "idle",
@@ -24,11 +27,6 @@ export type ActiveTab = Readonly<{
   url: string | undefined;
 }>;
 
-export type LiveChatStateStore = Readonly<{
-  isEnabled(tabId: number): Promise<boolean>;
-  setEnabled(tabId: number, enabled: boolean): Promise<void>;
-}>;
-
 type PageActionMessage = Extract<RuntimeMessage, { type: "translate-page" | "restore-page" }>;
 
 export type BackgroundCoordinator = Readonly<{
@@ -38,6 +36,7 @@ export type BackgroundCoordinator = Readonly<{
     senderFrameId?: number,
   ): Promise<TabState | undefined>;
   liveChatEndpointRegistered(tabId: number): Promise<void>;
+  navigationStarted(tabId: number): void;
   removeTab(tabId: number): void;
   settingsChanged(): void;
 }>;
@@ -50,8 +49,10 @@ export const createBackgroundCoordinator = (
   let pageActionQueue: Promise<void> = Promise.resolve();
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
   const liveChatGeneration = (tabId: number): number => liveChatGenerations.get(tabId) ?? 0;
-  const invalidateLiveChatReplay = (tabId: number): void => {
-    liveChatGenerations.set(tabId, liveChatGeneration(tabId) + 1);
+  const invalidateLiveChatReplay = (tabId: number): number => {
+    const generation = liveChatGeneration(tabId) + 1;
+    liveChatGenerations.set(tabId, generation);
+    return generation;
   };
   const isTopLiveChat = (tab: ActiveTab): boolean =>
     hasTopLiveChat(tab.id) || isYouTubeLiveChatUrl(tab.url ?? "");
@@ -64,24 +65,31 @@ export const createBackgroundCoordinator = (
     return queued;
   };
   const startPageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
-    invalidateLiveChatReplay(tab.id);
+    const generation = invalidateLiveChatReplay(tab.id);
     await dependencies.liveChatState.setEnabled(tab.id, true);
+    if (generation !== liveChatGeneration(tab.id)) return;
+    dependencies.sendToLiveChat(tab.id, { type: "start-live-chat" });
     if (!isTopLiveChat(tab)) {
       try {
         await dependencies.sendToTop(tab.id, message);
       } catch (error: unknown) {
         invalidateLiveChatReplay(tab.id);
         await dependencies.liveChatState.setEnabled(tab.id, false);
+        dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
         throw error;
       }
     }
-    dependencies.sendToLiveChat(tab.id, { type: "start-live-chat" });
   };
   const restorePageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
     invalidateLiveChatReplay(tab.id);
     await dependencies.liveChatState.setEnabled(tab.id, false);
     if (!isTopLiveChat(tab)) await dependencies.sendToTop(tab.id, message);
     dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
+  };
+  const clearLiveChatIntent = (tabId: number): void => {
+    states.delete(tabId);
+    invalidateLiveChatReplay(tabId);
+    void queuePageAction(async () => dependencies.liveChatState.setEnabled(tabId, false));
   };
   return {
     async receive(value, senderTabId, senderFrameId) {
@@ -144,10 +152,11 @@ export const createBackgroundCoordinator = (
         dependencies.sendToLiveChat(tabId, { type: "start-live-chat" });
       }
     },
+    navigationStarted(tabId) {
+      clearLiveChatIntent(tabId);
+    },
     removeTab(tabId) {
-      states.delete(tabId);
-      invalidateLiveChatReplay(tabId);
-      void dependencies.liveChatState.setEnabled(tabId, false);
+      clearLiveChatIntent(tabId);
     },
     settingsChanged() {
       dependencies.broadcastSettings();
@@ -157,23 +166,6 @@ export const createBackgroundCoordinator = (
 
 const assertNever = (value: never): never => {
   throw new TypeError(`Unhandled message: ${String(value)}`);
-};
-
-const createLiveChatStateStore = (): LiveChatStateStore => {
-  const key = (tabId: number): string => `live-chat:${tabId}`;
-  return {
-    async isEnabled(tabId) {
-      const stored: Record<string, unknown> = await chrome.storage.session.get(key(tabId));
-      return stored[key(tabId)] === true;
-    },
-    async setEnabled(tabId, enabled) {
-      if (enabled) {
-        await chrome.storage.session.set({ [key(tabId)]: true });
-        return;
-      }
-      await chrome.storage.session.remove(key(tabId));
-    },
-  };
 };
 
 if (typeof chrome !== "undefined") {
@@ -242,6 +234,9 @@ if (typeof chrome !== "undefined") {
     port.onDisconnect.addListener(() => frames.remove(endpoint));
   });
   chrome.tabs.onRemoved.addListener((tabId) => coordinator.removeTab(tabId));
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === "loading") coordinator.navigationStarted(tabId);
+  });
   chrome.storage.onChanged.addListener((_changes, area) => {
     if (area === "sync") coordinator.settingsChanged();
   });

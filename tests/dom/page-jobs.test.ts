@@ -157,6 +157,39 @@ describe("full-page controller", () => {
     expect(requests).toEqual(["First", "Second"]);
   });
 
+  it("restores a hovered live-chat message when the frame restores", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const message = appendLiveChatMessage(items, "First");
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        return translated(`번역:${request.text}`);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    message.dispatchEvent(new Event("pointerenter"));
+    expect(message.textContent).toBe("번역:First");
+
+    // When
+    controller.restorePage();
+
+    // Then
+    expect(message.textContent).toBe("First");
+    message.dispatchEvent(new Event("pointerleave"));
+    message.dispatchEvent(new Event("pointerenter"));
+    expect(message.textContent).toBe("First");
+  });
+
   it("reports partial failure while allowing successful peers to finish", async () => {
     // Given
     addSources("First", "Broken", "Third");

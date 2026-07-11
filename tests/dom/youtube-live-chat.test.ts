@@ -181,4 +181,37 @@ describe("YouTube live chat", () => {
 
     expect(translated).toEqual(["First", "Second"]);
   });
+
+  it("drops the oldest pending messages when its queue reaches capacity", async () => {
+    // Given
+    const items = chatFixture();
+    items.append(messageRenderer("First"));
+    const first = deferred<void>();
+    const next = deferred<void>();
+    const translated: string[] = [];
+    const session = createYouTubeLiveChatSession({
+      document,
+      translate(source) {
+        const text = collectSourceText(source);
+        translated.push(text);
+        if (text === "First") return first.promise;
+        next.resolve();
+        return new Promise<void>(() => undefined);
+      },
+    });
+
+    await session.start();
+    await flushMutations();
+    for (let index = 2; index <= 102; index += 1) {
+      items.append(messageRenderer(`Message ${index}`));
+    }
+    await flushMutations();
+
+    // When
+    first.resolve();
+    await next.promise;
+
+    // Then
+    expect(translated).toEqual(["First", "Message 3"]);
+  });
 });

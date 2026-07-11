@@ -10,9 +10,9 @@
 
 ## What the extension accesses
 
-LingoLens reads eligible text in HTTP and HTTPS pages only when it needs to translate or restore page content. It uses the `storage` permission to keep its settings in Chrome storage. It asks for HTTP and HTTPS page access so its page and element controls can work on those pages.
+LingoLens reads eligible text in HTTP and HTTPS pages only when it needs to translate or restore page content. It uses the `storage` permission to keep its settings in Chrome storage. During an enabled YouTube Live Chat session, it also keeps one session-only boolean keyed to the tab identifier so a Chrome MV3 worker restart can reconnect that same chat; it does not store chat text. The flag is cleared when translation is restored, the tab starts navigating, the tab closes, or the browser session ends. It asks for HTTP and HTTPS page access so its page and element controls can work on those pages.
 
-The extension does not request a separate translation-service host permission, load remote code, or include an analytics service.
+The extension does not request a separate translation-service host permission, load remote code, or include an analytics service. Its all-frame content-script setting is used only for the YouTube `/live_chat` frame path described in the manuals; ordinary cross-origin iframe content is not translated.
 
 ## Chrome-managed models
 

@@ -12,4 +12,4 @@ Do not mark a release ready until every applicable item has been checked.
 - [ ] Review the current Chrome Web Store policies before submission.
 - [ ] Inspect all icon sizes and the store icon for clarity and ownership.
 - [ ] Prepare and review Chrome Web Store listing assets, screenshots, descriptions, and privacy disclosures.
-- [ ] If YouTube Live Chat is included in a future release, manually verify its YouTube-only MVP behavior and do not imply support for other chat services.
+- [ ] Manually verify the included YouTube Live Chat MVP on a public chat: start, incoming messages, hover-only rendering, restore, reload/reconnect, and no console errors. Do not imply support for other chat services.

@@ -38,11 +38,13 @@ bun run build
 
 Automatic detection can be uncertain for short text. If LingoLens asks for a language or chooses poorly, open the element language menu and select an explicit source language.
 
-LingoLens does not run on browser-internal pages, the Chrome Web Store, PDF viewer internals, images, video subtitles, code blocks, editable fields, or cross-origin iframe content.
+LingoLens does not run on browser-internal pages, the Chrome Web Store, PDF viewer internals, images, video subtitles, code blocks, editable fields, or ordinary cross-origin iframe content. The only iframe exception is the dedicated YouTube Live Chat path below.
 
 ## YouTube Live Chat status
 
-YouTube Live Chat is a planned, YouTube-only MVP and is not included in this release. LingoLens does not claim support for other live-chat services.
+LingoLens includes an experimental, YouTube-only Live Chat MVP. When you use **페이지 전체 번역** on a YouTube watch page or its `/live_chat` pop-out, LingoLens can observe eligible ordinary chat-message text in YouTube's Live Chat frame and translate it with the same on-device model. Live Chat always uses temporary hover replacement, even if the page display setting is inline; it does not add translation cards to the chat layout.
+
+Only YouTube `live_chat` frames are handled. The extension does not claim support for other live-chat services, chat composer text, paid/membership UI, or non-message page content. This experimental path still requires final manual acceptance on a real public chat before a public release.
 
 ## Model and language-pair limits
 

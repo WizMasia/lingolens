@@ -141,7 +141,7 @@ export const createContentApp = (
           ? dependencies.controller.startLiveChat()
           : undefined;
       case "stop-live-chat":
-        if (hasLiveChatCommands(dependencies.controller)) dependencies.controller.stopLiveChat();
+        dependencies.controller.restorePage();
         return undefined;
       case "get-tab-state":
         return dependencies.controller.getState();

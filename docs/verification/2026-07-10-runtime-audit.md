@@ -83,3 +83,36 @@
 ## Outstanding Manual Evidence
 
 An interactive Chrome session must still verify unpacked loading, background/content entry startup, native API exposure in the content-script isolated world, first-use model download/user activation, real translation output, popup persistence, offline reuse, and inline/hover behavior on a live page. Automated browser control cannot currently attach to the user's Chrome session, and the headless environment cannot provide a trustworthy extension-load or installed-model/offline acceptance pass.
+
+## 2026-07-11 Interactive Chrome Follow-up
+
+The extension was rebuilt, loaded unpacked from `dist/`, and manually reloaded in the user's Chrome profile. A browser-controlled visit to `tests/fixtures/mixed-language.html` then supplied the previously outstanding content-script evidence.
+
+### Hypothesis 9: Reloaded extension context leaves the content script unusable
+
+**Risk:** Reloading an unpacked MV3 extension invalidates an existing content-script context and the page cannot recover after its next reload.
+
+**Evidence:** After the extension was reloaded in `chrome://extensions`, the fixture itself was reloaded. Ctrl translated the English paragraph to Korean through the installed extension. Chrome console collection reported no warning or error entries; in particular, no new `Extension context invalidated` error appeared.
+
+**Result:** A page reload after extension reload re-establishes a working content script. Existing already-loaded pages can still hold an invalidated context until the user reloads them, which is standard Chrome extension behavior and is documented operationally by the reload step.
+
+### Hypothesis 10: Hover mode injects UI or permanently damages page text
+
+**Risk:** The default hover presentation leaves an inline card/menu in the document or does not restore the original text on pointer leave.
+
+**Evidence:** With the default hover setting, Ctrl enabled translation for the fixture paragraph. Moving the pointer away restored the exact English source; moving it back displayed the Korean translation. DOM inspection found zero `[data-local-translator-ui="inline"]` hosts throughout the sequence (only the closed-shadow accessibility announcer host exists).
+
+**Result:** The installed extension performs temporary in-place hover replacement without creating a translation element in the page layout.
+
+### Hypothesis 11: The translation shortcut cannot disable an individual translation
+
+**Risk:** Repeating the translation shortcut opens page-affecting controls or leaves a translation active.
+
+**Evidence:** Pressing Ctrl a second time on the translated fixture paragraph removed its record. A subsequent pointer leave/enter cycle continued to show the original English rather than the Korean translation, and no inline host was created.
+
+**Result:** The configured primary shortcut is a per-element on/off toggle; the separate menu shortcut remains the path for language override/retranslation.
+
+### Remaining manual evidence
+
+- Full-page activation and each popup/options control need a user-visible acceptance pass in the installed extension UI.
+- A public YouTube live-chat iframe was confirmed present on a current live page, but the popup-driven `Start live chat` action has not yet been activated in a real public chat. Its behavior is covered by the dynamic DOM, frame-routing, worker-restart, and race regression suites; it should remain an explicit private-beta acceptance item before public release.

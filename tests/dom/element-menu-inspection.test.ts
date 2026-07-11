@@ -18,6 +18,14 @@ Object.defineProperties(globalThis, {
   Text: { configurable: true, value: testWindow.Text },
   document: { configurable: true, value: testWindow.document },
 });
+Object.defineProperty(testWindow.HTMLElement.prototype, "getClientRects", {
+  configurable: true,
+  value: () => [new testWindow.DOMRect(0, 0, 100, 20)],
+});
+Object.defineProperty(testWindow, "getComputedStyle", {
+  configurable: true,
+  value: () => ({ display: "block", opacity: "1", visibility: "visible" }),
+});
 
 const settings: Settings = {
   displayMode: "inline",
@@ -123,5 +131,38 @@ describe("element menu source inspection", () => {
 
     expect(openedSelection?.detection).toEqual({ kind: "not-detected" });
     expect(controller.store.getOrCreate(source).detection).toEqual({ kind: "not-detected" });
+  });
+
+  it("uses the same normalized eligible source text as translation", async () => {
+    const source = document.createElement("p");
+    source.append("  Hello\n ", document.createElement("code"), " world  ");
+    const code = source.querySelector("code");
+    if (code === null) throw new TypeError("Code fixture unavailable");
+    code.textContent = "excluded";
+    document.body.append(source);
+    const detectSource = vi.fn().mockResolvedValue({ kind: "needs-confirmation" });
+    const menu: ElementMenu = {
+      async open(): Promise<ElementMenuResult> {
+        return { kind: "cancel" };
+      },
+      announce() {},
+      destroy() {},
+    };
+    const engine: TranslationEngine = {
+      detectSource,
+      translate: vi.fn(),
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, menu, settings });
+
+    await controller.openElementMenu(source);
+
+    expect(detectSource).toHaveBeenCalledWith({
+      text: "Hello world",
+      source: { kind: "auto" },
+    });
   });
 });

@@ -2,7 +2,7 @@ import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
 import type { ElementMenuSelection } from "./element-menu";
 import type { ElementRecord, RecordStore } from "./records";
-import { sourceDetectionRequest } from "./translation-attempt";
+import { sourceDetectionRequest, sourceRecordText } from "./translation-attempt";
 
 export type ElementMenuInspection = Readonly<{
   engine: TranslationEngine;
@@ -28,7 +28,9 @@ const inspectAutomaticSource = async (
 ): Promise<ElementMenuSelection> => {
   const { engine, record, settings, store } = inspection;
   const fingerprint = record.source.textContent ?? "";
-  const detection = await engine.detectSource(sourceDetectionRequest(record.source, fingerprint));
+  const detection = await engine.detectSource(
+    sourceDetectionRequest(record.source, sourceRecordText(record)),
+  );
   if (
     store.has(record) &&
     record.source.isConnected &&

@@ -46,7 +46,9 @@ export const executeTranslation = async (
   const attemptVersion = record.beginAttempt();
   record.transition("translating");
   try {
-    const result = await runtime.engine.translate(translationRequest(attempt, recordText(record)));
+    const result = await runtime.engine.translate(
+      translationRequest(attempt, sourceRecordText(record)),
+    );
     if (!runtime.store.has(record) || !record.isCurrentAttempt(attemptVersion)) return false;
     if (attempt.signal?.aborted === true) {
       restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
@@ -151,7 +153,7 @@ const detectionState = (
     ? { kind: "user-selected", language }
     : { kind: "detected", language, provenance };
 
-const recordText = (record: ElementRecord): string =>
+export const sourceRecordText = (record: ElementRecord): string =>
   record.currentSnapshot
     .map(({ value }) => value.replace(/\s+/gu, " ").trim())
     .filter((value) => value.length > 0)

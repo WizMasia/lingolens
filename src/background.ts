@@ -1,4 +1,5 @@
 import { createFrameRegistry, type FrameEndpoint, isYouTubeLiveChatUrl } from "./frame-registry";
+import { createLiveChatIntentTracker } from "./live-chat-intent";
 import { createLiveChatStateStore, type LiveChatStateStore } from "./live-chat-state";
 import { parseMessage, type RuntimeMessage, type TabState } from "./shared/protocol";
 
@@ -45,16 +46,10 @@ export const createBackgroundCoordinator = (
   dependencies: BackgroundDependencies,
 ): BackgroundCoordinator => {
   const states = new Map<number, TabState>();
-  const liveChatGenerations = new Map<number, number>();
-  const liveChatIntents = new Map<number, boolean>();
+  const liveChatIntent = createLiveChatIntentTracker();
   let pageActionQueue: Promise<void> = Promise.resolve();
+  let pageLifecycleEpoch = 0;
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
-  const liveChatGeneration = (tabId: number): number => liveChatGenerations.get(tabId) ?? 0;
-  const invalidateLiveChatReplay = (tabId: number): number => {
-    const generation = liveChatGeneration(tabId) + 1;
-    liveChatGenerations.set(tabId, generation);
-    return generation;
-  };
   const isTopLiveChat = (tab: ActiveTab): boolean =>
     hasTopLiveChat(tab.id) || isYouTubeLiveChatUrl(tab.url ?? "");
   const queuePageAction = (action: () => Promise<void>): Promise<void> => {
@@ -66,17 +61,15 @@ export const createBackgroundCoordinator = (
     return queued;
   };
   const startPageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
-    const generation = invalidateLiveChatReplay(tab.id);
-    liveChatIntents.set(tab.id, true);
+    const generation = liveChatIntent.start(tab.id);
     await dependencies.liveChatState.setEnabled(tab.id, true);
-    if (generation !== liveChatGeneration(tab.id)) return;
+    if (generation !== liveChatIntent.generation(tab.id)) return;
     dependencies.sendToLiveChat(tab.id, { type: "start-live-chat" });
     if (!isTopLiveChat(tab)) {
       try {
         await dependencies.sendToTop(tab.id, message);
       } catch (error: unknown) {
-        invalidateLiveChatReplay(tab.id);
-        liveChatIntents.set(tab.id, false);
+        liveChatIntent.disable(tab.id);
         await dependencies.liveChatState.setEnabled(tab.id, false);
         dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
         throw error;
@@ -84,24 +77,19 @@ export const createBackgroundCoordinator = (
     }
   };
   const restorePageAction = async (tab: ActiveTab, message: PageActionMessage): Promise<void> => {
-    invalidateLiveChatReplay(tab.id);
-    liveChatIntents.set(tab.id, false);
+    liveChatIntent.disable(tab.id);
     await dependencies.liveChatState.setEnabled(tab.id, false);
     if (!isTopLiveChat(tab)) await dependencies.sendToTop(tab.id, message);
     dependencies.sendToLiveChat(tab.id, { type: "stop-live-chat" });
   };
   const clearLiveChatIntent = (tabId: number, forget: boolean): void => {
+    pageLifecycleEpoch += 1;
     states.delete(tabId);
-    const generation = invalidateLiveChatReplay(tabId);
-    liveChatIntents.set(tabId, false);
+    const generation = liveChatIntent.disable(tabId);
     void queuePageAction(async () => {
       await dependencies.liveChatState.setEnabled(tabId, false);
-      if (
-        forget &&
-        generation === liveChatGeneration(tabId) &&
-        liveChatIntents.get(tabId) === false
-      ) {
-        liveChatIntents.delete(tabId);
+      if (forget && generation === liveChatIntent.generation(tabId)) {
+        liveChatIntent.forgetIfCurrent(tabId, generation);
       }
     });
   };
@@ -133,19 +121,23 @@ export const createBackgroundCoordinator = (
           dependencies.broadcastSettings();
           return undefined;
         case "translate-page": {
+          const lifecycleEpoch = pageLifecycleEpoch;
           const tab = dependencies.activeTab();
           await queuePageAction(async () => {
+            if (lifecycleEpoch !== pageLifecycleEpoch) return;
             const descriptor = await tab;
-            if (descriptor === undefined) return;
+            if (descriptor === undefined || lifecycleEpoch !== pageLifecycleEpoch) return;
             await startPageAction(descriptor, message);
           });
           return undefined;
         }
         case "restore-page": {
+          const lifecycleEpoch = pageLifecycleEpoch;
           const tab = dependencies.activeTab();
           await queuePageAction(async () => {
+            if (lifecycleEpoch !== pageLifecycleEpoch) return;
             const descriptor = await tab;
-            if (descriptor === undefined) return;
+            if (descriptor === undefined || lifecycleEpoch !== pageLifecycleEpoch) return;
             await restorePageAction(descriptor, message);
           });
           return undefined;
@@ -158,12 +150,12 @@ export const createBackgroundCoordinator = (
       }
     },
     async liveChatEndpointRegistered(tabId) {
-      const generation = liveChatGeneration(tabId);
-      const intent = liveChatIntents.get(tabId);
+      const generation = liveChatIntent.generation(tabId);
+      const intent = liveChatIntent.intent(tabId);
       if (intent === false) return;
       if (
         (intent ?? (await dependencies.liveChatState.isEnabled(tabId))) &&
-        generation === liveChatGeneration(tabId)
+        generation === liveChatIntent.generation(tabId)
       ) {
         dependencies.sendToLiveChat(tabId, { type: "start-live-chat" });
       }

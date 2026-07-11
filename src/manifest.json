@@ -27,6 +27,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
+      "all_frames": true,
       "js": ["content.js"],
       "run_at": "document_idle"
     }

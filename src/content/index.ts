@@ -16,11 +16,29 @@ export type ContentDependencies = Readonly<{
   controller: TranslationController;
   loadSettings(): Promise<Settings>;
   isTrustedEvent?(event: Event): boolean;
+  isTopFrame?(): boolean;
 }>;
 
 export type ContentApp = Readonly<{
   handleMessage(value: unknown): Promise<unknown> | unknown;
   destroy(): void;
+}>;
+
+export type ContentPort = Readonly<{
+  onMessage: Readonly<{ addListener(listener: (value: unknown) => void): void }>;
+  onDisconnect: Readonly<{ addListener(listener: () => void): void }>;
+  disconnect(): void;
+}>;
+
+export type ContentPortRuntime = Readonly<{
+  connect(options: Readonly<{ name: string }>): ContentPort;
+}>;
+
+export type ContentPortConnection = Readonly<{ destroy(): void }>;
+
+type LiveChatCommands = Readonly<{
+  startLiveChat(): Promise<void>;
+  stopLiveChat(): void;
 }>;
 
 export const productionLanguages = () => LANGUAGE_CHOICES;
@@ -31,6 +49,31 @@ export const eventElement = (event: Pick<Event, "composedPath" | "target">): Ele
   return event.target instanceof Element ? event.target : null;
 };
 
+export const connectContentPort = (
+  runtime: ContentPortRuntime,
+  app: ContentApp,
+): ContentPortConnection => {
+  let destroyed = false;
+  let currentPort: ContentPort | undefined;
+  const connect = (): void => {
+    const port = runtime.connect({ name: "lingolens-frame" });
+    currentPort = port;
+    port.onMessage.addListener((value) => {
+      void app.handleMessage(value);
+    });
+    port.onDisconnect.addListener(() => {
+      if (!destroyed) connect();
+    });
+  };
+  connect();
+  return {
+    destroy() {
+      destroyed = true;
+      currentPort?.disconnect();
+    },
+  };
+};
+
 export const createContentApp = (
   document: Document,
   dependencies: ContentDependencies,
@@ -38,6 +81,7 @@ export const createContentApp = (
   let settings = dependencies.controller.settings;
   let currentTarget: HTMLElement | null = null;
   let pendingAction: ShortcutAction | null = null;
+  const installsPageHandlers = dependencies.isTopFrame?.() ?? true;
 
   const isTrustedEvent = (event: Event): boolean =>
     dependencies.isTrustedEvent?.(event) ?? event.isTrusted;
@@ -92,6 +136,13 @@ export const createContentApp = (
       case "restore-page":
         dependencies.controller.restorePage();
         return undefined;
+      case "start-live-chat":
+        return hasLiveChatCommands(dependencies.controller)
+          ? dependencies.controller.startLiveChat()
+          : undefined;
+      case "stop-live-chat":
+        if (hasLiveChatCommands(dependencies.controller)) dependencies.controller.stopLiveChat();
+        return undefined;
       case "get-tab-state":
         return dependencies.controller.getState();
       case "settings-changed":
@@ -107,19 +158,23 @@ export const createContentApp = (
     }
   };
 
-  document.addEventListener("pointerover", onPointer, true);
-  document.addEventListener("keydown", onKey, true);
-  document.addEventListener("keyup", onKeyUp, true);
-  void dependencies.loadSettings().then((loaded) => {
-    settings = loaded;
-    dependencies.controller.applySettings(loaded);
-  });
+  if (installsPageHandlers) {
+    document.addEventListener("pointerover", onPointer, true);
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    void dependencies.loadSettings().then((loaded) => {
+      settings = loaded;
+      dependencies.controller.applySettings(loaded);
+    });
+  }
   return {
     handleMessage,
     destroy() {
-      document.removeEventListener("pointerover", onPointer, true);
-      document.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("keyup", onKeyUp, true);
+      if (installsPageHandlers) {
+        document.removeEventListener("pointerover", onPointer, true);
+        document.removeEventListener("keydown", onKey, true);
+        document.removeEventListener("keyup", onKeyUp, true);
+      }
       dependencies.controller.destroy();
     },
   };
@@ -135,6 +190,14 @@ const matchedAction = (event: KeyboardEvent, settings: Settings): ShortcutAction
 
 const actionBinding = (action: ShortcutAction, settings: Settings): TriggerBinding =>
   action === "menu" ? settings.menuTrigger : settings.trigger;
+
+const hasLiveChatCommands = (
+  controller: TranslationController,
+): controller is TranslationController & LiveChatCommands =>
+  "startLiveChat" in controller &&
+  typeof controller.startLiveChat === "function" &&
+  "stopLiveChat" in controller &&
+  typeof controller.stopLiveChat === "function";
 
 const isEditable = (value: EventTarget | undefined): boolean =>
   value instanceof Element &&
@@ -172,8 +235,27 @@ if (typeof chrome !== "undefined") {
         void chrome.runtime.sendMessage({ type: "tab-state", state });
       },
     });
-    const app = createContentApp(document, { controller, loadSettings });
+    const app = createContentApp(document, {
+      controller,
+      loadSettings,
+      isTopFrame: () => window.top === window,
+    });
     chrome.runtime.onMessage.addListener((value: unknown) => app.handleMessage(value));
-    window.addEventListener("pagehide", () => app.destroy(), { once: true });
+    const connection = connectContentPort(
+      {
+        connect(options) {
+          return chrome.runtime.connect(options);
+        },
+      },
+      app,
+    );
+    window.addEventListener(
+      "pagehide",
+      () => {
+        connection.destroy();
+        app.destroy();
+      },
+      { once: true },
+    );
   });
 }

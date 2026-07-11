@@ -20,6 +20,7 @@ import {
   type TranslationAttempt,
   type TranslationRuntime,
 } from "./translation-attempt";
+import { createYouTubeLiveChatSession } from "./youtube-live-chat";
 
 export type { ElementLanguageChoice } from "./element-menu";
 
@@ -35,6 +36,8 @@ export type TranslationController = Readonly<{
   translateTarget(source?: HTMLElement): Promise<void>;
   translatePage(): Promise<void>;
   restorePage(): void;
+  startLiveChat(): Promise<void>;
+  stopLiveChat(): void;
   getState(): TabState;
   retranslate(source: HTMLElement, choice: ElementLanguageOverride): Promise<void>;
   openElementMenu(source: HTMLElement): Promise<void>;
@@ -107,6 +110,7 @@ export const createTranslationController = (
       ? createInlineView(dependencies.document, actions)
       : createHoverView();
   view = createView();
+  const liveChatView = createHoverView();
   const menu =
     dependencies.menu ??
     createElementMenu(dependencies.document, dependencies.languages ?? settingsLanguages(settings));
@@ -121,9 +125,11 @@ export const createTranslationController = (
     },
   };
 
-  const perform = async (attempt: TranslationAttempt): Promise<boolean> => {
-    return executeTranslation(attempt, runtime);
-  };
+  const perform = async (
+    attempt: TranslationAttempt,
+    translationView: TranslationView = view,
+  ): Promise<boolean> => executeTranslation(attempt, { ...runtime, view: () => translationView });
+  const liveChatRecords = new WeakSet<ElementRecord>();
 
   const page = createPageController({
     document: dependencies.document,
@@ -141,9 +147,28 @@ export const createTranslationController = (
       return record.phase === "error" || record.phase === "stale" ? "failed" : "skipped";
     },
     onStale(record) {
-      view.markStale(record);
+      (liveChatRecords.has(record) ? liveChatView : view).markStale(record);
     },
     onState: dependencies.onState ?? (() => undefined),
+  });
+  const liveChat = createYouTubeLiveChatSession({
+    document: dependencies.document,
+    async translate(source, signal) {
+      liveChatRecords.add(store.getOrCreate(source));
+      try {
+        await perform(
+          {
+            source,
+            preference: settings.source,
+            target: targetLanguage(settings),
+            signal,
+          },
+          liveChatView,
+        );
+      } finally {
+        page.syncRecords();
+      }
+    },
   });
 
   const retranslate = async (
@@ -196,7 +221,12 @@ export const createTranslationController = (
       page.syncRecords();
     },
     translatePage: page.translatePage,
-    restorePage: page.restorePage,
+    restorePage() {
+      liveChat.stop();
+      page.restorePage();
+    },
+    startLiveChat: liveChat.start,
+    stopLiveChat: liveChat.stop,
     getState: page.getState,
     retranslate,
     openElementMenu(source) {
@@ -209,11 +239,15 @@ export const createTranslationController = (
       if (!displayChanged) return;
       view.destroy();
       view = createView();
-      for (const record of store.active) view.render(record);
+      for (const record of store.active) {
+        if (!liveChatRecords.has(record)) view.render(record);
+      }
     },
     destroy() {
       if (!active) return;
       active = false;
+      liveChat.destroy();
+      liveChatView.destroy();
       page.destroy();
       menu.destroy();
       announcer.destroy();

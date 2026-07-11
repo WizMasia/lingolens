@@ -1,5 +1,6 @@
 import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
+import type { NanoLanguageDecision } from "./nano-language-detector";
 import type {
   AutomaticDetectionEvidence,
   DetectionProvenance,
@@ -36,6 +37,7 @@ export type AiTranslator = Readonly<{
 export type AiAdapter = Readonly<{
   detect(text: string): Promise<readonly AiDetection[]>;
   detectWithChrome(text: string): Promise<AiSecondaryDetection | undefined>;
+  detectWithNano?(text: string, context: string): Promise<NanoLanguageDecision>;
   availability(source: string, target: string): Promise<AiAvailability>;
   createTranslator(source: string, target: string): Promise<AiTranslator>;
   destroy(): void;

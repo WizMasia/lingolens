@@ -8,6 +8,7 @@ export type DetectionProvenance =
   | "context-detector"
   | "chrome-i18n"
   | "script"
+  | "gemini-nano"
   | "user";
 
 export type SourceDetection =
@@ -109,5 +110,14 @@ export const createSourceDetector =
     }
 
     const script = inferScriptLanguage(request.text);
-    return script === undefined ? { kind: "needs-confirmation" } : detected(script, "script");
+    if (script !== undefined) return detected(script, "script");
+
+    const detectWithNano = adapter.detectWithNano;
+    if (detectWithNano === undefined) return { kind: "needs-confirmation" };
+    const nano = await attempt(() => detectWithNano(request.text, detectionText));
+    if (nano?.kind === "detected" && nano.confidence >= 0.8) {
+      return detected(nano.language, "gemini-nano");
+    }
+
+    return { kind: "needs-confirmation" };
   };

@@ -1,0 +1,59 @@
+import { LANGUAGE_CHOICES, normalizeLanguage } from "../shared/languages";
+
+export type NanoLanguageDecision =
+  | Readonly<{ kind: "detected"; language: string; confidence: number }>
+  | Readonly<{ kind: "unavailable" }>;
+
+export type NanoLanguageDetector = Readonly<{
+  detect(text: string, context: string): Promise<NanoLanguageDecision>;
+}>;
+
+export type NanoLanguageResponseSource = (text: string, context: string) => Promise<string>;
+
+const MINIMUM_CONFIDENCE = 0.8;
+const SUPPORTED_LANGUAGES = new Set(LANGUAGE_CHOICES.map(({ value }) => value));
+
+const unavailable = (): NanoLanguageDecision => ({ kind: "unavailable" });
+
+export const createNanoLanguageDetector = (
+  request: NanoLanguageResponseSource,
+): NanoLanguageDetector => ({
+  async detect(text, context) {
+    return parseNanoLanguageDecision(await request(text, context));
+  },
+});
+
+const parseNanoLanguageDecision = (response: string): NanoLanguageDecision => {
+  try {
+    const value: unknown = JSON.parse(response);
+    if (!isNanoResponse(value)) return unavailable();
+
+    const language = normalizeLanguage(value.language);
+    if (
+      language === undefined ||
+      !SUPPORTED_LANGUAGES.has(language) ||
+      !Number.isFinite(value.confidence) ||
+      value.confidence < MINIMUM_CONFIDENCE ||
+      value.confidence > 1
+    ) {
+      return unavailable();
+    }
+
+    return { kind: "detected", language, confidence: value.confidence };
+  } catch (error: unknown) {
+    if (error instanceof SyntaxError) return unavailable();
+    throw error;
+  }
+};
+
+const isNanoResponse = (
+  value: unknown,
+): value is Readonly<{ language: string; confidence: number }> =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Object.keys(value).length === 2 &&
+  "language" in value &&
+  "confidence" in value &&
+  typeof value.language === "string" &&
+  typeof value.confidence === "number";

@@ -5,6 +5,7 @@ import { createSourceDetector } from "../../src/content/source-detection";
 type AdapterOptions = Readonly<{
   detect?: AiAdapter["detect"];
   detectWithChrome?: AiAdapter["detectWithChrome"];
+  detectWithNano?: NonNullable<AiAdapter["detectWithNano"]>;
   detections?: readonly (readonly AiDetection[])[];
   chromeDetection?: AiSecondaryDetection;
 }>;
@@ -17,6 +18,7 @@ const makeAdapter = (options: AdapterOptions = {}): AiAdapter => ({
       .mockResolvedValueOnce(options.detections?.[0] ?? [])
       .mockResolvedValueOnce(options.detections?.[1] ?? []),
   detectWithChrome: options.detectWithChrome ?? vi.fn().mockResolvedValue(options.chromeDetection),
+  ...(options.detectWithNano === undefined ? {} : { detectWithNano: options.detectWithNano }),
   availability: vi.fn().mockResolvedValue("available"),
   createTranslator: vi.fn(),
   destroy: vi.fn(),
@@ -203,5 +205,47 @@ describe("source detection", () => {
       language: "en",
       provenance: "user",
     });
+  });
+
+  it("uses Nano only after deterministic detection is unavailable", async () => {
+    // Given
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.8,
+    });
+    const detector = createSourceDetector(makeAdapter({ detectWithNano }));
+
+    // When
+    const result = detector({ text: "1234", source: { kind: "auto" } });
+
+    // Then
+    await expect(result).resolves.toEqual({
+      kind: "detected",
+      language: "es",
+      provenance: "gemini-nano",
+    });
+    expect(detectWithNano).toHaveBeenCalledWith("1234", "1234");
+  });
+
+  it("preserves script detection before Nano", async () => {
+    // Given
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.8,
+    });
+    const detector = createSourceDetector(makeAdapter({ detectWithNano }));
+
+    // When
+    const result = detector({ text: "안녕하세요", source: { kind: "auto" } });
+
+    // Then
+    await expect(result).resolves.toEqual({
+      kind: "detected",
+      language: "ko",
+      provenance: "script",
+    });
+    expect(detectWithNano).not.toHaveBeenCalled();
   });
 });

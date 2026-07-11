@@ -32,6 +32,7 @@ const fixture = (): PopupDependencies & { sent: RuntimeMessage[] } => {
         displayMode: "hover",
         source: { kind: "auto" },
         target: { kind: "fixed", language: "ja" },
+        liveChatNanoEnabled: false,
         trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
         menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
       }) satisfies Settings,

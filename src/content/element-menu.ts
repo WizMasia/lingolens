@@ -203,6 +203,7 @@ const detectedSourceLabel = (
     "context-detector": "Chrome AI with context",
     "chrome-i18n": "Chrome fallback",
     script: "Script inference",
+    "gemini-nano": "Gemini Nano (experimental)",
     user: "User selected",
   } as const satisfies Readonly<Record<typeof detection.provenance, string>>;
   return `${language} (${provenanceLabels[detection.provenance]})`;

@@ -37,6 +37,7 @@ const SETTINGS: Settings = {
   displayMode: "inline",
   source: { kind: "auto" },
   target: { kind: "browser", resolvedLanguage: "ko" },
+  liveChatNanoEnabled: false,
   trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };

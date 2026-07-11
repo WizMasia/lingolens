@@ -170,6 +170,11 @@ describe("targeted translation", () => {
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
     expect(host).not.toBeNull();
     expect(document.querySelector("img")).toBeNull();
+    expect(controller.store.getOrCreate(source).detection).toEqual({
+      kind: "detected",
+      language: "en",
+      provenance: "language-detector",
+    });
   });
 
   it("restores a successful target on a repeated primary translation", async () => {

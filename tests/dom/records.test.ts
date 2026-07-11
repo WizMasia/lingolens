@@ -65,6 +65,7 @@ describe("element records", () => {
       text: "안녕하세요",
       sourceLanguage: "en",
       targetLanguage: "ko",
+      provenance: "language-detector",
     });
   });
 

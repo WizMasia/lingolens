@@ -1,6 +1,7 @@
 import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
 import {
+  type DetectionProvenance,
   type TranslationEngine,
   TranslationError,
   type TranslationRequest,
@@ -85,6 +86,7 @@ const restoreCancelledAttempt = (
     priorSuccess.sourceLanguage,
     priorSuccess.targetLanguage,
     fingerprint,
+    priorSuccess.provenance,
   );
 };
 
@@ -109,13 +111,22 @@ const commitResult = (commit: ResultCommit): boolean => {
   const { record, result, fingerprint, runtime } = commit;
   switch (result.kind) {
     case "translated":
-      record.complete(result.text, result.sourceLanguage, result.targetLanguage, fingerprint);
+      record.setDetection(detectionState(result.sourceLanguage, result.provenance));
+      record.complete(
+        result.text,
+        result.sourceLanguage,
+        result.targetLanguage,
+        fingerprint,
+        result.provenance,
+      );
       runtime.view().render(record);
       return true;
     case "skipped":
+      record.setDetection(detectionState(result.sourceLanguage, result.provenance));
       runtime.store.remove(record.source);
       return false;
     case "unknown-source":
+      record.setDetection({ kind: "needs-confirmation" });
       record.fail(UNKNOWN_SOURCE_NOTICE);
       runtime.view().setError(record, UNKNOWN_SOURCE_NOTICE);
       runtime.announce(UNKNOWN_SOURCE_NOTICE);
@@ -124,6 +135,14 @@ const commitResult = (commit: ResultCommit): boolean => {
       return assertNever(result);
   }
 };
+
+const detectionState = (
+  language: string,
+  provenance: DetectionProvenance,
+): ElementRecord["detection"] =>
+  provenance === "user"
+    ? { kind: "user-selected", language }
+    : { kind: "detected", language, provenance };
 
 const recordText = (record: ElementRecord): string =>
   record.currentSnapshot

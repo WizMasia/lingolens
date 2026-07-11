@@ -77,6 +77,7 @@ describe("unknown source action", () => {
 
     expect(text).toContain("원문 언어를 확인할 수 없습니다.");
     expect(opened).toBe(1);
+    expect(controller.store.getOrCreate(source).detection).toEqual({ kind: "needs-confirmation" });
   });
 
   it("retries a hover-mode error with the primary trigger and opens language selection explicitly", async () => {

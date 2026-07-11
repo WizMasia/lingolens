@@ -1,3 +1,4 @@
+import type { DetectionProvenance } from "./source-detection";
 import { collectSourceTextNodes } from "./targets";
 
 export const RECORD_PHASES = [
@@ -22,7 +23,14 @@ export type TranslationSuccess = Readonly<{
   text: string;
   sourceLanguage: string;
   targetLanguage: string;
+  provenance: DetectionProvenance;
 }>;
+
+export type ElementDetectionState =
+  | Readonly<{ kind: "not-detected" }>
+  | Readonly<{ kind: "detected"; language: string; provenance: DetectionProvenance }>
+  | Readonly<{ kind: "user-selected"; language: string }>
+  | Readonly<{ kind: "needs-confirmation" }>;
 
 export type ElementLanguageOverride = Readonly<{
   source: "auto" | string;
@@ -74,6 +82,7 @@ export class ElementRecord {
   #error: string | null = null;
   #sourceFingerprint: string;
   #languageOverride: ElementLanguageOverride | null = null;
+  #detection: ElementDetectionState = { kind: "not-detected" };
   #viewValues = new Map<Text, string>();
   #viewMutationCounts = new Map<Text, number>();
   #activeViewCount = 0;
@@ -113,6 +122,10 @@ export class ElementRecord {
     return this.#languageOverride;
   }
 
+  get detection(): ElementDetectionState {
+    return this.#detection;
+  }
+
   beginAttempt(): number {
     this.#attemptVersion += 1;
     this.#phase = "queued";
@@ -137,10 +150,11 @@ export class ElementRecord {
     sourceLanguage: string,
     targetLanguage: string,
     sourceFingerprint = this.#sourceFingerprint,
+    provenance: DetectionProvenance = "language-detector",
   ): void {
     this.#assertTransition("translated");
     this.#phase = "translated";
-    this.#lastSuccess = { text, sourceLanguage, targetLanguage };
+    this.#lastSuccess = { text, sourceLanguage, targetLanguage, provenance };
     if (this.#activeViewCount === 0 && (this.source.textContent ?? "") === sourceFingerprint) {
       this.#currentSnapshot = snapshotText(this.source);
     }
@@ -159,11 +173,20 @@ export class ElementRecord {
 
   setLanguageOverride(override: ElementLanguageOverride | null): void {
     this.#languageOverride = override;
+    this.#detection =
+      override !== null && override.source !== "auto"
+        ? { kind: "user-selected", language: override.source }
+        : { kind: "not-detected" };
+  }
+
+  setDetection(detection: ElementDetectionState): void {
+    this.#detection = detection;
   }
 
   refreshSource(): void {
     this.#currentSnapshot = snapshotText(this.source);
     this.#sourceFingerprint = this.source.textContent ?? "";
+    if (this.#detection.kind !== "user-selected") this.#detection = { kind: "not-detected" };
   }
 
   registerRestorer(callback: RestoreCallback): () => void {

@@ -75,8 +75,14 @@ const flushMutations = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-const appendLiveChatMessage = (items: HTMLElement, text: string): HTMLElement => {
+const appendLiveChatMessage = (items: HTMLElement, text: string, author?: string): HTMLElement => {
   const renderer = document.createElement("yt-live-chat-text-message-renderer");
+  if (author !== undefined) {
+    const authorName = document.createElement("a");
+    authorName.id = "author-name";
+    authorName.href = author;
+    renderer.append(authorName);
+  }
   const message = document.createElement("span");
   message.id = "message";
   message.textContent = text;
@@ -189,6 +195,47 @@ describe("full-page controller", () => {
     message.dispatchEvent(new Event("pointerleave"));
     message.dispatchEvent(new Event("pointerenter"));
     expect(message.textContent).toBe("First");
+  });
+
+  it("reuses a fixed source only for later messages from the selected author", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const authorOneChoice = appendLiveChatMessage(items, "namaste", "/channel/one");
+    const requests: TranslationRequest[] = [];
+    const laterRequests = deferred<void>();
+    let trackLaterRequests = false;
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        if (trackLaterRequests && requests.length === 2) laterRequests.resolve();
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    await controller.retranslate(authorOneChoice, { source: "hi", target: "ko" });
+    requests.length = 0;
+    trackLaterRequests = true;
+
+    // When
+    appendLiveChatMessage(items, "namaste", "/channel/one");
+    appendLiveChatMessage(items, "namaste", "/channel/two");
+    await laterRequests.promise;
+
+    // Then
+    expect(requests).toContainEqual(
+      expect.objectContaining({ source: { kind: "fixed", language: "hi" } }),
+    );
+    expect(requests.map(({ source }) => source.kind)).toContain("auto");
   });
 
   it("reports partial failure while allowing successful peers to finish", async () => {

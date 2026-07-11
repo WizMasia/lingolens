@@ -214,4 +214,30 @@ describe("YouTube live chat", () => {
     // Then
     expect(translated).toEqual(["First", "Message 3"]);
   });
+
+  it("processes a new message before historical queued messages", async () => {
+    // Given
+    const items = chatFixture();
+    const first = deferred<void>();
+    const translated: string[] = [];
+    const session = createYouTubeLiveChatSession({
+      document,
+      translate(source) {
+        const text = collectSourceText(source);
+        translated.push(text);
+        return text === "old" ? first.promise : Promise.resolve();
+      },
+    });
+    items.append(messageRenderer("old"), messageRenderer("older"));
+
+    // When
+    await session.start();
+    items.append(messageRenderer("new"));
+    await flushMutations();
+    first.resolve();
+    await flushMutations();
+
+    // Then
+    expect(translated).toEqual(["old", "new", "older"]);
+  });
 });

@@ -7,6 +7,7 @@ import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
 import { createInlineView } from "./inline-view";
 import type { PageJobOutcome } from "./jobs";
+import { createLiveChatLanguageMemory } from "./live-chat-language-memory";
 import { createPageController } from "./page-controller";
 import {
   createRecordStore,
@@ -130,6 +131,7 @@ export const createTranslationController = (
     translationView: TranslationView = view,
   ): Promise<boolean> => executeTranslation(attempt, { ...runtime, view: () => translationView });
   const liveChatRecords = new WeakSet<ElementRecord>();
+  const liveChatLanguages = createLiveChatLanguageMemory();
 
   const page = createPageController({
     document: dependencies.document,
@@ -159,7 +161,7 @@ export const createTranslationController = (
         await perform(
           {
             source,
-            preference: settings.source,
+            preference: liveChatPreference(source),
             target: targetLanguage(settings),
             signal,
           },
@@ -177,6 +179,7 @@ export const createTranslationController = (
   ): Promise<void> => {
     const record = store.getOrCreate(source);
     record.setLanguageOverride(choice);
+    rememberLiveChatLanguage(source, choice);
     await perform({
       source,
       preference:
@@ -184,6 +187,33 @@ export const createTranslationController = (
       target: choice.target,
     });
     page.syncRecords();
+  };
+
+  const liveChatPreference = (source: HTMLElement): Settings["source"] => {
+    const override = store.getOrCreate(source).languageOverride;
+    if (override !== null) {
+      return override.source === "auto"
+        ? { kind: "auto" }
+        : { kind: "fixed", language: override.source };
+    }
+    const authorId = liveChat.authorId(source);
+    const language = authorId === undefined ? undefined : liveChatLanguages.get(authorId);
+    return language === undefined ? settings.source : { kind: "fixed", language };
+  };
+
+  const rememberLiveChatLanguage = (source: HTMLElement, choice: ElementLanguageOverride): void => {
+    const authorId = liveChat.authorId(source);
+    if (authorId === undefined) return;
+    if (choice.source === "auto") {
+      liveChatLanguages.clear(authorId);
+      return;
+    }
+    liveChatLanguages.set(authorId, choice.source);
+  };
+
+  const stopLiveChat = (): void => {
+    liveChat.stop();
+    liveChatLanguages.destroy();
   };
 
   const restoreElement = (source: HTMLElement): void => {
@@ -222,11 +252,11 @@ export const createTranslationController = (
     },
     translatePage: page.translatePage,
     restorePage() {
-      liveChat.stop();
+      stopLiveChat();
       page.restorePage();
     },
     startLiveChat: liveChat.start,
-    stopLiveChat: liveChat.stop,
+    stopLiveChat,
     getState: page.getState,
     retranslate,
     openElementMenu(source) {
@@ -247,6 +277,7 @@ export const createTranslationController = (
       if (!active) return;
       active = false;
       liveChat.destroy();
+      liveChatLanguages.destroy();
       liveChatView.destroy();
       page.destroy();
       menu.destroy();

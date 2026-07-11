@@ -168,6 +168,37 @@ describe("content entry", () => {
     expect(controller.translateTarget).not.toHaveBeenCalled();
   });
 
+  it("opens only the language menu in a child live-chat frame", async () => {
+    // Given
+    const message = document.createElement("span");
+    message.textContent = "Meaningful chat text";
+    document.body.append(message);
+    const controller = controllerFixture();
+    const app = createContentApp(document, {
+      controller,
+      loadSettings: async () => SETTINGS,
+      isTopFrame: () => false,
+      isTrustedEvent: () => true,
+    });
+    apps.push(app);
+
+    // When
+    message.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    message.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Shift",
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+    await Promise.resolve();
+
+    // Then
+    expect(controller.openElementMenu).toHaveBeenCalledWith(message);
+    expect(controller.translateTarget).not.toHaveBeenCalled();
+  });
+
   it("tracks the composed shadow target instead of the retargeted host", () => {
     const host = document.createElement("div");
     const shadow = host.attachShadow({ mode: "open" });
@@ -219,7 +250,7 @@ describe("content entry", () => {
     expect(controller.stopLiveChat).not.toHaveBeenCalled();
   });
 
-  it("leaves page handlers off in a child frame while routing live commands", async () => {
+  it("tracks child-frame targets without enabling the primary translation shortcut", async () => {
     const paragraph = document.createElement("p");
     paragraph.textContent = "Meaningful text to translate";
     document.body.append(paragraph);
@@ -240,7 +271,7 @@ describe("content entry", () => {
     await app.handleMessage({ type: "start-live-chat" });
     app.handleMessage({ type: "stop-live-chat" });
 
-    expect(controller.setHovered).not.toHaveBeenCalled();
+    expect(controller.setHovered).toHaveBeenCalledWith(paragraph);
     expect(controller.translateTarget).not.toHaveBeenCalled();
     expect(controller.startLiveChat).toHaveBeenCalledOnce();
     expect(controller.restorePage).toHaveBeenCalledOnce();

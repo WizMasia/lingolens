@@ -81,11 +81,12 @@ export const createContentApp = (
   let settings = dependencies.controller.settings;
   let currentTarget: HTMLElement | null = null;
   let pendingAction: ShortcutAction | null = null;
-  const installsPageHandlers = dependencies.isTopFrame?.() ?? true;
+  const isTopFrame = dependencies.isTopFrame?.() ?? true;
 
   const isTrustedEvent = (event: Event): boolean =>
     dependencies.isTrustedEvent?.(event) ?? event.isTrusted;
   const executeAction = (action: ShortcutAction, event: KeyboardEvent): void => {
+    if (action === "translation" && !isTopFrame) return;
     if (action === "translation") {
       void dependencies.controller.translateTarget();
       return;
@@ -112,6 +113,10 @@ export const createContentApp = (
     }
     event.preventDefault();
     if (isModifierTrigger(actionBinding(action, settings))) {
+      if (!isTopFrame && action === "menu") {
+        executeAction(action, event);
+        return;
+      }
       pendingAction = action;
       return;
     }
@@ -160,23 +165,19 @@ export const createContentApp = (
     }
   };
 
-  if (installsPageHandlers) {
-    document.addEventListener("pointerover", onPointer, true);
-    document.addEventListener("keydown", onKey, true);
-    document.addEventListener("keyup", onKeyUp, true);
-    void dependencies.loadSettings().then((loaded) => {
-      settings = loaded;
-      dependencies.controller.applySettings(loaded);
-    });
-  }
+  document.addEventListener("pointerover", onPointer, true);
+  document.addEventListener("keydown", onKey, true);
+  document.addEventListener("keyup", onKeyUp, true);
+  void dependencies.loadSettings().then((loaded) => {
+    settings = loaded;
+    dependencies.controller.applySettings(loaded);
+  });
   return {
     handleMessage,
     destroy() {
-      if (installsPageHandlers) {
-        document.removeEventListener("pointerover", onPointer, true);
-        document.removeEventListener("keydown", onKey, true);
-        document.removeEventListener("keyup", onKeyUp, true);
-      }
+      document.removeEventListener("pointerover", onPointer, true);
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keyup", onKeyUp, true);
       dependencies.controller.destroy();
     },
   };
@@ -216,18 +217,26 @@ if (typeof chrome !== "undefined") {
     return parseSettings(stored["settings"], chrome.i18n.getUILanguage());
   };
   void loadSettings().then((settings) => {
-    const adapter = createChromiumAiAdapter((event) => {
-      void chrome.runtime.sendMessage({
-        type: "tab-state",
-        state: {
-          phase: "downloading",
-          completed: Math.round(event.loaded * 100),
-          total: 100,
-          skipped: 0,
-          failed: 0,
+    const adapter = createChromiumAiAdapter(
+      (event) => {
+        void chrome.runtime.sendMessage({
+          type: "tab-state",
+          state: {
+            phase: "downloading",
+            completed: Math.round(event.loaded * 100),
+            total: 100,
+            skipped: 0,
+            failed: 0,
+          },
+        });
+      },
+      {
+        detectWithNano(text, context) {
+          return chrome.runtime.sendMessage({ type: "detect-nano-source", text, context });
         },
-      });
-    });
+        isNanoEnabled: () => controller.settings.liveChatNanoEnabled,
+      },
+    );
     const controller = createTranslationController({
       document,
       engine: createTranslationEngine(adapter),

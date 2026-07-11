@@ -1,13 +1,21 @@
 import { type AiAdapter, type AiTranslator, TranslationError } from "./ai-engine";
+import type { NanoLanguageDecision } from "./nano-language-detector";
 
 export type DownloadProgressListener = (event: ProgressEvent) => void;
+
+export type ChromiumAiAdapterOptions = Readonly<{
+  detectWithNano?(text: string, context: string): Promise<unknown>;
+  isNanoEnabled?(): boolean;
+}>;
 
 const noProgress = (): void => undefined;
 
 export const createChromiumAiAdapter = (
   onDownloadProgress: DownloadProgressListener = noProgress,
+  options: ChromiumAiAdapterOptions = {},
 ): AiAdapter => {
   const models = new Set<DestroyableModel>();
+  const detectWithNano = options.detectWithNano;
   let detectorPromise: Promise<LanguageDetector> | undefined;
   let active = true;
 
@@ -68,6 +76,18 @@ export const createChromiumAiAdapter = (
         return undefined;
       }
     },
+    ...(detectWithNano === undefined
+      ? {}
+      : {
+          async detectWithNano(text: string, context: string): Promise<NanoLanguageDecision> {
+            if (options.isNanoEnabled?.() === false) return { kind: "unavailable" };
+            try {
+              return nanoDecision(await detectWithNano(text, context));
+            } catch {
+              return { kind: "unavailable" };
+            }
+          },
+        }),
     async availability(source, target) {
       assertActive(active);
       const api = translatorApi();
@@ -156,3 +176,24 @@ const apiUnavailable = (message: string): TranslationError =>
 
 const translationFailed = (message: string, cause: unknown): TranslationError =>
   new TranslationError("translation-failed", message, cause);
+
+const nanoDecision = (value: unknown): NanoLanguageDecision => {
+  if (!isNanoDecision(value)) return { kind: "unavailable" };
+  return value;
+};
+
+type NanoDecisionRecord = Readonly<{
+  kind?: unknown;
+  language?: unknown;
+  confidence?: unknown;
+}>;
+
+const isNanoDecision = (value: unknown): value is NanoLanguageDecision =>
+  isRecord(value) &&
+  (value.kind === "unavailable" ||
+    (value.kind === "detected" &&
+      typeof value.language === "string" &&
+      typeof value.confidence === "number"));
+
+const isRecord = (value: unknown): value is NanoDecisionRecord =>
+  typeof value === "object" && value !== null && !Array.isArray(value);

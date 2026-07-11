@@ -86,6 +86,48 @@ describe("Chromium AI adapter", () => {
     await expect(createChromiumAiAdapter().detectWithChrome("Brief")).resolves.toBeUndefined();
   });
 
+  it("rejects Chrome i18n detection after adapter destruction", async () => {
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: { i18n: { detectLanguage: vi.fn() } },
+    });
+    const adapter = createChromiumAiAdapter();
+    adapter.destroy();
+
+    await expect(adapter.detectWithChrome("Brief")).rejects.toEqual(
+      new TranslationError("api-unavailable", "Chromium AI adapter is destroyed"),
+    );
+  });
+
+  it("rejects in-flight Chrome i18n detection destroyed before completion", async () => {
+    let resolveDetection:
+      | ((value: { readonly isReliable: boolean; readonly languages: readonly [] }) => void)
+      | undefined;
+    const detectLanguage = vi.fn(
+      () =>
+        new Promise<{ readonly isReliable: boolean; readonly languages: readonly [] }>(
+          (resolve) => {
+            resolveDetection = resolve;
+          },
+        ),
+    );
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: { i18n: { detectLanguage } },
+    });
+    const adapter = createChromiumAiAdapter();
+
+    const pending = adapter.detectWithChrome("Brief");
+    await Promise.resolve();
+    expect(detectLanguage).toHaveBeenCalledOnce();
+    adapter.destroy();
+    resolveDetection?.({ isReliable: true, languages: [] });
+
+    await expect(pending).rejects.toEqual(
+      new TranslationError("api-unavailable", "Chromium AI adapter is destroyed"),
+    );
+  });
+
   it("reports API absence without reading missing globals", async () => {
     // Given
     Reflect.deleteProperty(globalThis, "LanguageDetector");

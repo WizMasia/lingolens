@@ -27,18 +27,16 @@ type PrimaryEvidence = Readonly<{
 }>;
 
 const primaryEvidence = (detections: Awaited<ReturnType<AiAdapter["detect"]>>): PrimaryEvidence => {
-  const candidates = new Set(
-    detections.flatMap(({ detectedLanguage }) => {
-      const language = normalizeLanguage(detectedLanguage ?? "");
-      return language === undefined ? [] : [language];
-    }),
-  );
-  const best = detections[0];
-  const accepted = normalizeLanguage(best?.detectedLanguage ?? "");
+  const normalized = detections.flatMap(({ detectedLanguage, confidence }) => {
+    const language = normalizeLanguage(detectedLanguage ?? "");
+    return language === undefined ? [] : [{ language, confidence }];
+  });
+  const candidates = new Set(normalized.map(({ language }) => language));
+  const best = normalized[0];
   return {
     candidates,
-    ...(accepted !== undefined && (best?.confidence ?? 0) >= PRIMARY_CONFIDENCE
-      ? { accepted }
+    ...(best !== undefined && (best.confidence ?? 0) >= PRIMARY_CONFIDENCE
+      ? { accepted: best.language }
       : {}),
   };
 };
@@ -71,17 +69,23 @@ export const createSourceDetector =
     if (primary.accepted !== undefined) return detected(primary.accepted, "language-detector");
 
     const context = request.source.context?.trim();
-    if (context !== undefined && context.length > 0 && context !== request.text.trim()) {
+    const detectionText =
+      context !== undefined && context.length > 0 && context !== request.text.trim()
+        ? `${request.text} ${context}`
+        : request.text;
+    if (detectionText !== request.text) {
       const contextual = primaryEvidence(
-        (await attempt(() => adapter.detect(`${request.text} ${context}`))) ?? [],
+        (await attempt(() => adapter.detect(detectionText))) ?? [],
       );
       for (const candidate of contextual.candidates) candidates.add(candidate);
       if (contextual.accepted !== undefined)
         return detected(contextual.accepted, "context-detector");
     }
 
-    const secondary = await attempt(() => adapter.detectWithChrome(request.text));
-    const bestSecondary = secondary?.languages[0];
+    const secondary = await attempt(() => adapter.detectWithChrome(detectionText));
+    const bestSecondary = secondary?.languages.find(
+      ({ language }) => normalizeLanguage(language) !== undefined,
+    );
     const secondaryLanguage = normalizeLanguage(bestSecondary?.language ?? "");
     if (
       secondaryLanguage !== undefined &&

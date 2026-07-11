@@ -165,4 +165,31 @@ describe("element menu source inspection", () => {
       source: { kind: "auto" },
     });
   });
+
+  it("returns a fresh not-detected record after restoring an element", () => {
+    const source = document.createElement("p");
+    source.textContent = "Hello";
+    document.body.append(source);
+    const engine: TranslationEngine = {
+      detectSource: vi.fn(),
+      translate: vi.fn(),
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings });
+    const staleRecord = controller.store.getOrCreate(source);
+    staleRecord.setDetection({
+      kind: "detected",
+      language: "en",
+      provenance: "language-detector",
+    });
+
+    controller.restoreElement(source);
+    const freshRecord = controller.store.getOrCreate(source);
+
+    expect(freshRecord).not.toBe(staleRecord);
+    expect(freshRecord.detection).toEqual({ kind: "not-detected" });
+  });
 });

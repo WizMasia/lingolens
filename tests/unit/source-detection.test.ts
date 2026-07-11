@@ -4,6 +4,7 @@ import { createSourceDetector } from "../../src/content/source-detection";
 
 type AdapterOptions = Readonly<{
   detect?: AiAdapter["detect"];
+  detectWithChrome?: AiAdapter["detectWithChrome"];
   detections?: readonly (readonly AiDetection[])[];
   chromeDetection?: AiSecondaryDetection;
 }>;
@@ -15,7 +16,7 @@ const makeAdapter = (options: AdapterOptions = {}): AiAdapter => ({
       .fn()
       .mockResolvedValueOnce(options.detections?.[0] ?? [])
       .mockResolvedValueOnce(options.detections?.[1] ?? []),
-  detectWithChrome: vi.fn().mockResolvedValue(options.chromeDetection),
+  detectWithChrome: options.detectWithChrome ?? vi.fn().mockResolvedValue(options.chromeDetection),
   availability: vi.fn().mockResolvedValue("available"),
   createTranslator: vi.fn(),
   destroy: vi.fn(),
@@ -41,6 +42,66 @@ describe("source detection", () => {
       makeAdapter({
         detections: [[{ detectedLanguage: "fr", confidence: 0.41 }]],
         chromeDetection: { reliable: true, languages: [{ language: "fr", percentage: 74 }] },
+      }),
+    );
+
+    await expect(detector({ text: "Bref", source: { kind: "auto" } })).resolves.toEqual({
+      kind: "detected",
+      language: "fr",
+      provenance: "chrome-i18n",
+    });
+  });
+
+  it("uses the same bounded context for CLD after an uncertain context retry", async () => {
+    const detectWithChrome = vi.fn<AiAdapter["detectWithChrome"]>().mockResolvedValue(undefined);
+    const detector = createSourceDetector(makeAdapter({ detectWithChrome }));
+
+    await detector({ text: "Bref", source: { kind: "auto", context: "Une phrase française" } });
+
+    expect(detectWithChrome).toHaveBeenCalledWith("Bref Une phrase française");
+  });
+
+  it("accepts primary evidence at exactly 0.60 confidence", async () => {
+    const detector = createSourceDetector(
+      makeAdapter({ detections: [[{ detectedLanguage: "fr", confidence: 0.6 }]] }),
+    );
+
+    await expect(detector({ text: "Bref", source: { kind: "auto" } })).resolves.toEqual({
+      kind: "detected",
+      language: "fr",
+      provenance: "language-detector",
+    });
+  });
+
+  it("accepts the next normalized primary candidate with its own confidence", async () => {
+    const detector = createSourceDetector(
+      makeAdapter({
+        detections: [
+          [
+            { detectedLanguage: "und", confidence: 0.99 },
+            { detectedLanguage: "fr", confidence: 0.6 },
+          ],
+        ],
+      }),
+    );
+
+    await expect(detector({ text: "Bref", source: { kind: "auto" } })).resolves.toEqual({
+      kind: "detected",
+      language: "fr",
+      provenance: "language-detector",
+    });
+  });
+
+  it("accepts the next normalized reliable CLD candidate", async () => {
+    const detector = createSourceDetector(
+      makeAdapter({
+        chromeDetection: {
+          reliable: true,
+          languages: [
+            { language: "und", percentage: 99 },
+            { language: "fr", percentage: 80 },
+          ],
+        },
       }),
     );
 

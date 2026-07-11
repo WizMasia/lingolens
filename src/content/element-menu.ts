@@ -1,3 +1,5 @@
+import type { ElementDetectionState } from "./records";
+
 export type ElementLanguageChoice = Readonly<{
   value: string;
   label: string;
@@ -8,10 +10,12 @@ export type ElementMenuResult =
   | Readonly<{ kind: "restore" }>
   | Readonly<{ kind: "cancel" }>;
 
+export type ElementMenuDetection = ElementDetectionState;
+
 export type ElementMenuSelection = Readonly<{
   source: "auto" | string;
   target: string;
-  detectedSource?: string;
+  detection: ElementMenuDetection;
 }>;
 
 export type ElementMenu = Readonly<{
@@ -138,7 +142,7 @@ const createControls = (
   const targetLabel = labeled(document, "Target language", target);
   const detected = document.createElement("p");
   detected.className = "detected";
-  detected.textContent = `Detected source: ${detectedSourceLabel(languages, selection.detectedSource)}`;
+  detected.textContent = `Detected source: ${detectedSourceLabel(languages, selection.detection)}`;
   const actions = document.createElement("div");
   actions.className = "actions";
   const translate = actionButton(document, "translate", "Translate again");
@@ -186,10 +190,22 @@ const appendLanguages = (
 
 const detectedSourceLabel = (
   languages: readonly ElementLanguageChoice[],
-  detectedSource: string | undefined,
+  detection: ElementMenuDetection,
 ): string => {
-  if (detectedSource === undefined) return "Unknown";
-  return languages.find(({ value }) => value === detectedSource)?.label ?? detectedSource;
+  if (detection.kind === "not-detected") return "Not detected yet";
+  if (detection.kind === "needs-confirmation") return "Needs confirmation";
+  const language =
+    languages.find(({ value }) => value === detection.language)?.label ?? detection.language;
+  if (detection.kind === "user-selected") return `${language} (User selected)`;
+  const provenanceLabels = {
+    lang: "HTML lang",
+    "language-detector": "Chrome AI",
+    "context-detector": "Chrome AI with context",
+    "chrome-i18n": "Chrome fallback",
+    script: "Script inference",
+    user: "User selected",
+  } as const satisfies Readonly<Record<typeof detection.provenance, string>>;
+  return `${language} (${provenanceLabels[detection.provenance]})`;
 };
 
 const appendOption = (select: HTMLSelectElement, value: string, label: string): void => {

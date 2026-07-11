@@ -1,12 +1,9 @@
 import type { TabState } from "../shared/protocol";
 import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
-import {
-  createElementMenu,
-  type ElementLanguageChoice,
-  type ElementMenu,
-  type ElementMenuSelection,
-} from "./element-menu";
+import { TranslationError } from "./ai-engine";
+import { createElementMenu, type ElementLanguageChoice, type ElementMenu } from "./element-menu";
+import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
 import { createInlineView } from "./inline-view";
 import type { PageJobOutcome } from "./jobs";
@@ -71,9 +68,18 @@ export const createTranslationController = (
   const notice = dependencies.notice ?? (() => undefined);
   let settings = dependencies.settings;
   let hovered: HTMLElement | null = null;
+  let active = true;
   let view: TranslationView;
   const openMenu = async (record: ElementRecord): Promise<void> => {
-    const result = await menu.open(record.source, menuSelection(record, settings));
+    const inspection = inspectMenuSelection({
+      engine: dependencies.engine,
+      record,
+      settings,
+      store,
+    });
+    const selection = inspection instanceof Promise ? await inspection : inspection;
+    if (!active) return;
+    const result = await menu.open(record.source, selection);
     switch (result.kind) {
       case "translate":
         await retranslate(record.source, result);
@@ -87,7 +93,15 @@ export const createTranslationController = (
         return assertNever(result);
     }
   };
-  const actions = { onAction: (record: ElementRecord): void => void openMenu(record) };
+  const actions = {
+    onAction(record: ElementRecord): void {
+      void openMenu(record).catch((error: unknown) => {
+        if (!active && error instanceof TranslationError && error.code === "api-unavailable")
+          return;
+        throw error;
+      });
+    },
+  };
   const createView = (): TranslationView =>
     settings.displayMode === "inline"
       ? createInlineView(dependencies.document, actions)
@@ -137,20 +151,20 @@ export const createTranslationController = (
     choice: ElementLanguageOverride,
   ): Promise<void> => {
     const record = store.getOrCreate(source);
-    const succeeded = await perform({
+    record.setLanguageOverride(choice);
+    await perform({
       source,
       preference:
         choice.source === "auto" ? { kind: "auto" } : { kind: "fixed", language: choice.source },
       target: choice.target,
     });
-    if (succeeded) record.setLanguageOverride(choice);
     page.syncRecords();
   };
 
   const restoreElement = (source: HTMLElement): void => {
     const record = store.getOrCreate(source);
     record.setLanguageOverride(null);
-    store.remove(source);
+    store.restoreTranslation(source);
     page.syncRecords();
   };
 
@@ -198,6 +212,8 @@ export const createTranslationController = (
       for (const record of store.active) view.render(record);
     },
     destroy() {
+      if (!active) return;
+      active = false;
       page.destroy();
       menu.destroy();
       announcer.destroy();
@@ -235,20 +251,6 @@ const createPoliteAnnouncer = (document: Document): PoliteAnnouncer => {
 
 const targetLanguage = (settings: Settings): string =>
   settings.target.kind === "fixed" ? settings.target.language : settings.target.resolvedLanguage;
-
-const menuSelection = (record: ElementRecord, settings: Settings): ElementMenuSelection => {
-  const detectedSource = record.lastSuccess?.sourceLanguage;
-  return {
-    source:
-      record.languageOverride?.source ??
-      (settings.source.kind === "fixed" ? settings.source.language : "auto"),
-    target:
-      record.languageOverride?.target ??
-      record.lastSuccess?.targetLanguage ??
-      targetLanguage(settings),
-    ...(detectedSource === undefined ? {} : { detectedSource }),
-  };
-};
 
 const settingsLanguages = (settings: Settings): readonly ElementLanguageChoice[] => {
   const values = new Set<string>([targetLanguage(settings)]);

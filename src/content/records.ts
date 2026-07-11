@@ -1,4 +1,7 @@
+import type { DetectionProvenance } from "./source-detection";
 import { collectSourceTextNodes } from "./targets";
+
+export { createRecordStore } from "./record-store";
 
 export const RECORD_PHASES = [
   "idle",
@@ -22,7 +25,14 @@ export type TranslationSuccess = Readonly<{
   text: string;
   sourceLanguage: string;
   targetLanguage: string;
+  provenance: DetectionProvenance;
 }>;
+
+export type ElementDetectionState =
+  | Readonly<{ kind: "not-detected" }>
+  | Readonly<{ kind: "detected"; language: string; provenance: DetectionProvenance }>
+  | Readonly<{ kind: "user-selected"; language: string }>
+  | Readonly<{ kind: "needs-confirmation" }>;
 
 export type ElementLanguageOverride = Readonly<{
   source: "auto" | string;
@@ -74,6 +84,7 @@ export class ElementRecord {
   #error: string | null = null;
   #sourceFingerprint: string;
   #languageOverride: ElementLanguageOverride | null = null;
+  #detection: ElementDetectionState = { kind: "not-detected" };
   #viewValues = new Map<Text, string>();
   #viewMutationCounts = new Map<Text, number>();
   #activeViewCount = 0;
@@ -113,6 +124,10 @@ export class ElementRecord {
     return this.#languageOverride;
   }
 
+  get detection(): ElementDetectionState {
+    return this.#detection;
+  }
+
   beginAttempt(): number {
     this.#attemptVersion += 1;
     this.#phase = "queued";
@@ -137,10 +152,11 @@ export class ElementRecord {
     sourceLanguage: string,
     targetLanguage: string,
     sourceFingerprint = this.#sourceFingerprint,
+    provenance: DetectionProvenance = "language-detector",
   ): void {
     this.#assertTransition("translated");
     this.#phase = "translated";
-    this.#lastSuccess = { text, sourceLanguage, targetLanguage };
+    this.#lastSuccess = { text, sourceLanguage, targetLanguage, provenance };
     if (this.#activeViewCount === 0 && (this.source.textContent ?? "") === sourceFingerprint) {
       this.#currentSnapshot = snapshotText(this.source);
     }
@@ -157,13 +173,32 @@ export class ElementRecord {
     this.#onPhaseChange(this);
   }
 
+  deactivateTranslation(): void {
+    this.#attemptVersion += 1;
+    this.restoreView("remove");
+    this.#phase = "idle";
+    this.#lastSuccess = null;
+    this.#error = null;
+    this.#onPhaseChange(this);
+  }
+
   setLanguageOverride(override: ElementLanguageOverride | null): void {
     this.#languageOverride = override;
+    if (override !== null && override.source !== "auto") {
+      this.#detection = { kind: "user-selected", language: override.source };
+    } else if (this.#detection.kind === "user-selected") {
+      this.#detection = { kind: "not-detected" };
+    }
+  }
+
+  setDetection(detection: ElementDetectionState): void {
+    this.#detection = detection;
   }
 
   refreshSource(): void {
     this.#currentSnapshot = snapshotText(this.source);
     this.#sourceFingerprint = this.source.textContent ?? "";
+    if (this.#detection.kind !== "user-selected") this.#detection = { kind: "not-detected" };
   }
 
   registerRestorer(callback: RestoreCallback): () => void {
@@ -212,47 +247,11 @@ export type RecordStore = Readonly<{
   has(record: ElementRecord): boolean;
   active: ReadonlySet<ElementRecord>;
   markStale(record: ElementRecord): void;
+  restoreTranslation(source: HTMLElement): void;
+  restoreAllTranslations(): void;
   remove(source: HTMLElement): void;
   clear(): void;
 }>;
-
-export const createRecordStore = (): RecordStore => {
-  let records = new WeakMap<HTMLElement, ElementRecord>();
-  const active = new Set<ElementRecord>();
-  const onPhaseChange = (record: ElementRecord): void => {
-    if (record.lastSuccess !== null || record.phase === "translated") active.add(record);
-  };
-
-  return {
-    active,
-    getOrCreate(source) {
-      const existing = records.get(source);
-      if (existing !== undefined) return existing;
-      const record = new ElementRecord(source, onPhaseChange);
-      records.set(source, record);
-      return record;
-    },
-    has(record) {
-      return records.get(record.source) === record;
-    },
-    markStale(record) {
-      record.restoreView("stale");
-      if (record.phase !== "stale") record.transition("stale");
-    },
-    remove(source) {
-      const record = records.get(source);
-      if (record === undefined) return;
-      record.restoreView("remove");
-      active.delete(record);
-      records.delete(source);
-    },
-    clear() {
-      for (const record of active) record.restoreView("clear");
-      active.clear();
-      records = new WeakMap<HTMLElement, ElementRecord>();
-    },
-  };
-};
 
 const snapshotText = (source: HTMLElement): readonly TextSnapshot[] => {
   return collectSourceTextNodes(source).map((node) => ({ node, value: node.data }));

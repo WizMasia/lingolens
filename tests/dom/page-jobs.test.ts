@@ -42,6 +42,7 @@ const translated = (text: string): TranslationResult => ({
   text,
   sourceLanguage: "en",
   targetLanguage: "ko",
+  provenance: "language-detector",
 });
 
 const deferred = <T>(): Readonly<{
@@ -75,6 +76,9 @@ describe("full-page controller", () => {
     // Given
     addSources("First", "Broken", "Third");
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate(request) {
         if (request.text === "Broken") {
           throw new TranslationError("translation-failed", "fixture");
@@ -108,6 +112,9 @@ describe("full-page controller", () => {
     const gate = deferred<TranslationResult>();
     const requests: TranslationRequest[] = [];
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       translate(request) {
         requests.push(request);
         return requests.length <= 3 ? gate.promise : Promise.resolve(translated(request.text));
@@ -144,6 +151,9 @@ describe("full-page controller", () => {
     addSources("One");
     const gate = deferred<TranslationResult>();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       translate: () => gate.promise,
       async availability() {
         return "available";
@@ -165,9 +175,45 @@ describe("full-page controller", () => {
     expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
   });
 
+  it("retains automatic detection evidence across full-page restoration", async () => {
+    const [source] = addSources("One");
+    if (source === undefined) throw new TypeError("Fixture source unavailable");
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.translatePage();
+
+    controller.restorePage();
+    await controller.translatePage();
+
+    expect(requests[1]?.source).toMatchObject({
+      kind: "auto",
+      knownDetection: {
+        kind: "detected",
+        language: "en",
+        provenance: "language-detector",
+      },
+    });
+  });
+
   it("does not publish tab state while the content app is shutting down", () => {
     const states: string[] = [];
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return translated("unused");
       },
@@ -198,6 +244,9 @@ describe("full-page controller", () => {
     const gate = deferred<TranslationResult>();
     let calls = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       translate(request) {
         calls += 1;
         return calls === 1 ? Promise.resolve(translated(request.text)) : gate.promise;
@@ -231,6 +280,9 @@ describe("full-page controller", () => {
     let pass = 0;
     const requests: string[] = [];
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate(request) {
         requests.push(request.text);
         return translated(`${pass}:${request.text}`);

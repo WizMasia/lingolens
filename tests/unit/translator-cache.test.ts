@@ -7,17 +7,45 @@ import {
 
 const adapterWith = (createTranslator: AiAdapter["createTranslator"]): AiAdapter => ({
   detect: vi.fn(),
+  detectWithChrome: vi.fn().mockResolvedValue(undefined),
   availability: vi.fn().mockResolvedValue("available"),
   createTranslator,
   destroy: vi.fn(),
 });
 
 describe("translator cache", () => {
+  it("preserves detection provenance across otherwise identical translations", async () => {
+    const translate = vi.fn<AiTranslator["translate"]>().mockResolvedValue("안녕하세요");
+    const engine = createTranslationEngine(
+      adapterWith(
+        vi.fn().mockResolvedValue({
+          translate,
+          destroy: vi.fn(),
+        }),
+      ),
+    );
+
+    const fixed = await engine.translate({
+      text: "Hello",
+      source: { kind: "fixed", language: "en" },
+      target: "ko",
+    });
+    const hinted = await engine.translate({
+      text: "Hello",
+      source: { kind: "auto", languageHint: "en" },
+      target: "ko",
+    });
+
+    expect(fixed).toMatchObject({ provenance: "user" });
+    expect(hinted).toMatchObject({ provenance: "lang" });
+  });
+
   it("does not deduplicate distinct requests containing delimiters", async () => {
     // Given
     const translate = vi.fn<AiTranslator["translate"]>().mockImplementation(async (text) => text);
     const adapter: AiAdapter = {
       detect: vi.fn().mockResolvedValue([{ detectedLanguage: "en", confidence: 0.99 }]),
+      detectWithChrome: vi.fn().mockResolvedValue(undefined),
       availability: vi.fn().mockResolvedValue("available"),
       createTranslator: vi.fn().mockResolvedValue({ translate, destroy: vi.fn() }),
       destroy: vi.fn(),

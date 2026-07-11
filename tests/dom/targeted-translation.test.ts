@@ -44,6 +44,7 @@ const translated = (text: string): TranslationResult => ({
   text,
   sourceLanguage: "en",
   targetLanguage: "ko",
+  provenance: "language-detector",
 });
 
 const sourceFixture = (text: string, lang?: string): HTMLElement => {
@@ -64,6 +65,9 @@ const engineFixture = (
   return {
     requests,
     engine: {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate(request) {
         requests.push(request);
         return result;
@@ -139,7 +143,11 @@ describe("targeted translation", () => {
   it("renders no translation when source and target languages match", async () => {
     // Given
     const source = sourceFixture("안녕하세요");
-    const { engine } = engineFixture({ kind: "skipped", sourceLanguage: "ko" });
+    const { engine } = engineFixture({
+      kind: "skipped",
+      sourceLanguage: "ko",
+      provenance: "language-detector",
+    });
     const controller = createTranslationController({ document, engine, settings: SETTINGS });
 
     // When
@@ -162,6 +170,11 @@ describe("targeted translation", () => {
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
     expect(host).not.toBeNull();
     expect(document.querySelector("img")).toBeNull();
+    expect(controller.store.getOrCreate(source).detection).toEqual({
+      kind: "detected",
+      language: "en",
+      provenance: "language-detector",
+    });
   });
 
   it("restores a successful target on a repeated primary translation", async () => {
@@ -264,6 +277,9 @@ describe("targeted translation", () => {
     const source = sourceFixture("Hello");
     let resolveTranslation: ((result: TranslationResult) => void) | undefined;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       translate: () =>
         new Promise((resolve) => {
           resolveTranslation = resolve;
@@ -292,6 +308,9 @@ describe("targeted translation", () => {
     const source = sourceFixture("Hello");
     const resolvers: Array<(result: TranslationResult) => void> = [];
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       translate: () =>
         new Promise((resolve) => {
           resolvers.push(resolve);
@@ -311,6 +330,7 @@ describe("targeted translation", () => {
       text: "こんにちは",
       sourceLanguage: "en",
       targetLanguage: "ja",
+      provenance: "language-detector",
     });
     await second;
     resolvers[0]?.(translated("오래된 결과"));

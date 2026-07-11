@@ -1,5 +1,5 @@
 import { Window } from "happy-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   TranslationEngine,
   TranslationRequest,
@@ -71,6 +71,7 @@ const result = (text: string, targetLanguage: string): TranslationResult => ({
   text,
   sourceLanguage: "en",
   targetLanguage,
+  provenance: "language-detector",
 });
 
 describe("per-element retranslation", () => {
@@ -83,6 +84,9 @@ describe("per-element retranslation", () => {
     const source = sourceFixture();
     const requests: TranslationRequest[] = [];
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate(request) {
         requests.push(request);
         return requests.length === 1 ? result("안녕하세요", "ko") : result("こんにちは", "ja");
@@ -115,7 +119,11 @@ describe("per-element retranslation", () => {
     const menu = createElementMenu(document, LANGUAGES);
 
     // When
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const shadow = shadowRoots.get(host);
@@ -135,7 +143,11 @@ describe("per-element retranslation", () => {
     source.tabIndex = 0;
     source.focus();
     const menu = createElementMenu(document, LANGUAGES);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const sourceSelect = shadowRoots
@@ -168,7 +180,11 @@ describe("per-element retranslation", () => {
     const menu = createElementMenu(document, LANGUAGES);
 
     // When
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
 
     // Then
@@ -184,6 +200,9 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return result("안녕하세요", "ko");
       },
@@ -212,10 +231,13 @@ describe("per-element retranslation", () => {
     await pending;
   });
 
-  it("shows an unknown detected source before the element has a successful translation", async () => {
+  it("shows detected source evidence before the element has a successful translation", async () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return result("안녕하세요", "ko");
       },
@@ -233,11 +255,13 @@ describe("per-element retranslation", () => {
 
     // When
     const pending = controller.openElementMenu(source);
+    await Promise.resolve();
+    await Promise.resolve();
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     const menuText = host === null ? "" : (shadowRoots.get(host)?.textContent ?? "");
 
     // Then
-    expect(menuText).toContain("Detected source: Unknown");
+    expect(menuText).toContain("Detected source: English (Chrome AI)");
 
     controller.destroy();
     await pending;
@@ -247,7 +271,11 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const menu = createElementMenu(document, LANGUAGES);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
 
     // When
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true, composed: true }));
@@ -261,7 +289,11 @@ describe("per-element retranslation", () => {
     // Given
     const source = sourceFixture();
     const menu = createElementMenu(document, LANGUAGES);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const shadow = shadowRoots.get(host);
@@ -297,7 +329,11 @@ describe("per-element retranslation", () => {
       { value: "en", label: "English duplicate" },
       { value: "ko", label: "Korean" },
     ]);
-    const pending = menu.open(source, { source: "auto", target: "ko" });
+    const pending = menu.open(source, {
+      source: "auto",
+      target: "ko",
+      detection: { kind: "not-detected" },
+    });
     const host = document.querySelector<HTMLElement>('[data-local-translator-ui="element-menu"]');
     if (host === null) throw new Error("fixture menu missing");
     const shadow = shadowRoots.get(host);
@@ -322,6 +358,9 @@ describe("per-element retranslation", () => {
     const source = sourceFixture();
     let attempt = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         attempt += 1;
         if (attempt === 1) return result("안녕하세요", "ko");
@@ -353,6 +392,9 @@ describe("per-element retranslation", () => {
     const source = sourceFixture();
     let attempt = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         attempt += 1;
         return attempt === 1 ? result("안녕하세요", "ko") : { kind: "unknown-source" };
@@ -389,12 +431,80 @@ describe("per-element retranslation", () => {
     expect(inlineText()).toContain("안녕하세요");
     expect(announcements).toEqual(["원문 언어를 확인할 수 없습니다."]);
     expect(notices).toEqual([]);
+    expect(controller.store.getOrCreate(source).languageOverride?.source).toBe("auto");
+  });
+
+  it("retains a fixed source choice when retranslation fails", async () => {
+    const source = sourceFixture();
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "user" };
+      },
+      async translate() {
+        throw new TranslationError("translation-failed", "fixture");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    await controller.retranslate(source, { source: "en", target: "ja" });
+
+    expect(controller.store.getOrCreate(source).languageOverride).toEqual({
+      source: "en",
+      target: "ja",
+    });
+    expect(controller.store.getOrCreate(source).detection).toEqual({
+      kind: "user-selected",
+      language: "en",
+    });
+  });
+
+  it("does not open the menu or reject unhandled when destroyed during action inspection", async () => {
+    const source = sourceFixture();
+    let rejectDetection: (error: TranslationError) => void = () => undefined;
+    const pendingDetection = new Promise<never>((_resolve, reject) => {
+      rejectDetection = reject;
+    });
+    const open = vi.fn<ElementMenu["open"]>().mockResolvedValue({ kind: "cancel" });
+    const menu: ElementMenu = { open, announce() {}, destroy() {} };
+    const engine: TranslationEngine = {
+      detectSource: () => pendingDetection,
+      async translate() {
+        return result("안녕하세요", "ko");
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {
+        rejectDetection(new TranslationError("api-unavailable", "destroyed"));
+      },
+    };
+    const controller = createTranslationController({ document, engine, menu, settings: SETTINGS });
+    await controller.translateTarget(source);
+    controller.store.getOrCreate(source).setDetection({ kind: "not-detected" });
+    const host = document.querySelector<HTMLElement>('[data-local-translator-ui="inline"]');
+    const button =
+      host === null ? undefined : shadowRoots.get(host)?.querySelector<HTMLButtonElement>("button");
+    if (button === undefined || button === null) throw new TypeError("Action fixture unavailable");
+
+    button.click();
+    controller.destroy();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("restores the element and clears its language override", async () => {
     // Given
     const source = sourceFixture();
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return result("안녕하세요", "ko");
       },

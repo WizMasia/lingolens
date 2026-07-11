@@ -48,6 +48,26 @@ export const createChromiumAiAdapter = (
         throw translationFailed("Language detection failed", error);
       }
     },
+    async detectWithChrome(text) {
+      assertActive(active);
+      const detectLanguage = globalThis.chrome?.i18n?.detectLanguage;
+      if (detectLanguage === undefined) return undefined;
+      try {
+        const result = await Promise.resolve().then(() => detectLanguage(text));
+        assertActive(active);
+        return {
+          reliable: result.isReliable,
+          languages: result.languages.map(({ language, percentage }) => ({
+            language,
+            percentage,
+          })),
+        };
+      } catch (error: unknown) {
+        if (error instanceof TranslationError) throw error;
+        assertActive(active);
+        return undefined;
+      }
+    },
     async availability(source, target) {
       assertActive(active);
       const api = translatorApi();

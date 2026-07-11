@@ -46,9 +46,13 @@ const translated = (): TranslationResult => ({
   text: "안녕하세요",
   sourceLanguage: "en",
   targetLanguage: "ko",
+  provenance: "language-detector",
 });
 
 const engine: TranslationEngine = {
+  async detectSource() {
+    return { kind: "detected", language: "en", provenance: "language-detector" };
+  },
   async translate() {
     return translated();
   },
@@ -260,6 +264,9 @@ describe("stale page content", () => {
     document.body.append(source);
     const requests: string[] = [];
     const recordingEngine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate(request) {
         requests.push(request.text);
         return translated();

@@ -23,6 +23,7 @@ const makeAdapter = (options: AdapterOptions = {}): AiAdapter => ({
       confidence: options.confidence ?? 0.99,
     },
   ]),
+  detectWithChrome: vi.fn().mockResolvedValue(undefined),
   availability: vi.fn().mockResolvedValue(options.availability ?? "available"),
   createTranslator:
     options.createTranslator ??
@@ -43,7 +44,11 @@ describe("translation engine", () => {
     const result = engine.translate({ text: "안녕하세요", source: { kind: "auto" }, target: "ko" });
 
     // Then
-    await expect(result).resolves.toEqual({ kind: "skipped", sourceLanguage: "ko" });
+    await expect(result).resolves.toEqual({
+      kind: "skipped",
+      sourceLanguage: "ko",
+      provenance: "language-detector",
+    });
   });
 
   it("deduplicates translator creation and identical in-flight text", async () => {
@@ -84,8 +89,51 @@ describe("translation engine", () => {
       text: "translated",
       sourceLanguage: "fr",
       targetLanguage: "ko",
+      provenance: "lang",
     });
     expect(adapter.detect).not.toHaveBeenCalled();
+  });
+
+  it("reuses known automatic evidence without invoking detection", async () => {
+    const adapter = makeAdapter({ detectedLanguage: "de" });
+    const engine = createTranslationEngine(adapter);
+
+    const result = await engine.translate({
+      text: "Hello",
+      source: {
+        kind: "auto",
+        knownDetection: {
+          kind: "detected",
+          language: "en",
+          provenance: "chrome-i18n",
+        },
+      },
+      target: "ko",
+    });
+
+    expect(result).toMatchObject({ sourceLanguage: "en", provenance: "chrome-i18n" });
+    expect(adapter.detect).not.toHaveBeenCalled();
+  });
+
+  it("keeps a valid language hint ahead of known automatic evidence", async () => {
+    const adapter = makeAdapter();
+    const engine = createTranslationEngine(adapter);
+
+    const result = await engine.translate({
+      text: "Bonjour",
+      source: {
+        kind: "auto",
+        languageHint: "fr",
+        knownDetection: {
+          kind: "detected",
+          language: "en",
+          provenance: "language-detector",
+        },
+      },
+      target: "ko",
+    });
+
+    expect(result).toMatchObject({ sourceLanguage: "fr", provenance: "lang" });
   });
 
   it("returns unknown source when detector confidence is below threshold", async () => {
@@ -99,22 +147,6 @@ describe("translation engine", () => {
     // Then
     await expect(result).resolves.toEqual({ kind: "unknown-source" });
     expect(adapter.createTranslator).not.toHaveBeenCalled();
-  });
-
-  it("uses context to detect source for text under twenty Unicode letters", async () => {
-    // Given
-    const adapter = makeAdapter();
-    const engine = createTranslationEngine(adapter);
-
-    // When
-    await engine.translate({
-      text: "Save",
-      source: { kind: "auto", context: "This setting saves your profile" },
-      target: "ko",
-    });
-
-    // Then
-    expect(adapter.detect).toHaveBeenCalledWith("This setting saves your profile");
   });
 
   it("rejects an unsupported language pair with a typed error", async () => {

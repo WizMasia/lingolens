@@ -1,6 +1,9 @@
 import { normalizeLanguage } from "../shared/languages";
 import type { SourcePreference } from "../shared/settings";
 import {
+  type AutomaticDetectionEvidence,
+  type DetectionProvenance,
+  type SourceDetectionRequest,
   type TranslationEngine,
   TranslationError,
   type TranslationRequest,
@@ -44,7 +47,9 @@ export const executeTranslation = async (
   const attemptVersion = record.beginAttempt();
   record.transition("translating");
   try {
-    const result = await runtime.engine.translate(translationRequest(attempt, recordText(record)));
+    const result = await runtime.engine.translate(
+      translationRequest(attempt, record, sourceRecordText(record)),
+    );
     if (!runtime.store.has(record) || !record.isCurrentAttempt(attemptVersion)) return false;
     if (attempt.signal?.aborted === true) {
       restoreCancelledAttempt(record, priorSuccess, fingerprint, runtime.store);
@@ -85,23 +90,49 @@ const restoreCancelledAttempt = (
     priorSuccess.sourceLanguage,
     priorSuccess.targetLanguage,
     fingerprint,
+    priorSuccess.provenance,
   );
 };
 
-const translationRequest = (attempt: TranslationAttempt, text: string): TranslationRequest => {
+const translationRequest = (
+  attempt: TranslationAttempt,
+  record: ElementRecord,
+  text: string,
+): TranslationRequest => {
   if (attempt.preference.kind === "fixed") {
     return { text, source: attempt.preference, target: attempt.target };
   }
-  const languageHint = nearestLanguage(attempt.source);
-  const context = nearbyContext(attempt.source, text);
+  return {
+    ...sourceDetectionRequest(attempt.source, text, automaticEvidence(record)),
+    target: attempt.target,
+  };
+};
+
+export const sourceDetectionRequest = (
+  source: HTMLElement,
+  text: string,
+  knownDetection?: AutomaticDetectionEvidence,
+): SourceDetectionRequest => {
+  const languageHint = nearestLanguage(source);
+  const context = nearbyContext(source, text);
   return {
     text,
     source: {
       kind: "auto",
       ...(languageHint === undefined ? {} : { languageHint }),
       ...(context.length === 0 ? {} : { context }),
+      ...(knownDetection === undefined ? {} : { knownDetection }),
     },
-    target: attempt.target,
+  };
+};
+
+const automaticEvidence = (record: ElementRecord): AutomaticDetectionEvidence | undefined => {
+  const detection = record.detection;
+  if (detection.kind !== "detected" || detection.provenance === "user") return undefined;
+  return {
+    kind: "detected",
+    language: detection.language,
+    provenance: detection.provenance,
   };
 };
 
@@ -109,13 +140,22 @@ const commitResult = (commit: ResultCommit): boolean => {
   const { record, result, fingerprint, runtime } = commit;
   switch (result.kind) {
     case "translated":
-      record.complete(result.text, result.sourceLanguage, result.targetLanguage, fingerprint);
+      record.setDetection(detectionState(result.sourceLanguage, result.provenance));
+      record.complete(
+        result.text,
+        result.sourceLanguage,
+        result.targetLanguage,
+        fingerprint,
+        result.provenance,
+      );
       runtime.view().render(record);
       return true;
     case "skipped":
-      runtime.store.remove(record.source);
+      record.setDetection(detectionState(result.sourceLanguage, result.provenance));
+      runtime.store.restoreTranslation(record.source);
       return false;
     case "unknown-source":
+      record.setDetection({ kind: "needs-confirmation" });
       record.fail(UNKNOWN_SOURCE_NOTICE);
       runtime.view().setError(record, UNKNOWN_SOURCE_NOTICE);
       runtime.announce(UNKNOWN_SOURCE_NOTICE);
@@ -125,14 +165,26 @@ const commitResult = (commit: ResultCommit): boolean => {
   }
 };
 
-const recordText = (record: ElementRecord): string =>
+const detectionState = (
+  language: string,
+  provenance: DetectionProvenance,
+): ElementRecord["detection"] =>
+  provenance === "user"
+    ? { kind: "user-selected", language }
+    : { kind: "detected", language, provenance };
+
+export const sourceRecordText = (record: ElementRecord): string =>
   record.currentSnapshot
     .map(({ value }) => value.replace(/\s+/gu, " ").trim())
     .filter((value) => value.length > 0)
     .join(" ");
 
 const nearestLanguage = (source: HTMLElement): string | undefined => {
-  const language = source.closest("[lang]")?.getAttribute("lang")?.trim();
+  const holder = source.closest("[lang]");
+  if (holder === source.ownerDocument.documentElement || holder === source.ownerDocument.body) {
+    return undefined;
+  }
+  const language = holder?.getAttribute("lang")?.trim();
   return language === undefined || language.length === 0 ? undefined : normalizeLanguage(language);
 };
 

@@ -51,6 +51,8 @@ const controllerFixture = (settings: Settings = SETTINGS): TranslationController
     getOrCreate: vi.fn(),
     has: vi.fn(),
     markStale: vi.fn(),
+    restoreTranslation: vi.fn(),
+    restoreAllTranslations: vi.fn(),
     remove: vi.fn(),
     clear: vi.fn(),
   },

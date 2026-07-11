@@ -46,6 +46,9 @@ describe("unknown source action", () => {
       destroy() {},
     };
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         return { kind: "unknown-source" };
       },
@@ -74,6 +77,7 @@ describe("unknown source action", () => {
 
     expect(text).toContain("원문 언어를 확인할 수 없습니다.");
     expect(opened).toBe(1);
+    expect(controller.store.getOrCreate(source).detection).toEqual({ kind: "needs-confirmation" });
   });
 
   it("retries a hover-mode error with the primary trigger and opens language selection explicitly", async () => {
@@ -91,6 +95,9 @@ describe("unknown source action", () => {
     };
     let attempts = 0;
     const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
       async translate() {
         attempts += 1;
         return { kind: "unknown-source" };

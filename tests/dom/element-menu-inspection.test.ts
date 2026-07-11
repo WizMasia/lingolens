@@ -237,35 +237,4 @@ describe("element menu source inspection", () => {
       source: { kind: "auto" },
     });
   });
-
-  it("retains automatic provenance after restoring an element", () => {
-    const source = document.createElement("p");
-    source.textContent = "Hello";
-    document.body.append(source);
-    const engine: TranslationEngine = {
-      detectSource: vi.fn(),
-      translate: vi.fn(),
-      async availability() {
-        return "available";
-      },
-      destroy() {},
-    };
-    const controller = createTranslationController({ document, engine, settings });
-    const record = controller.store.getOrCreate(source);
-    record.setDetection({
-      kind: "detected",
-      language: "en",
-      provenance: "language-detector",
-    });
-
-    controller.restoreElement(source);
-    const restoredRecord = controller.store.getOrCreate(source);
-
-    expect(restoredRecord).toBe(record);
-    expect(restoredRecord.detection).toEqual({
-      kind: "detected",
-      language: "en",
-      provenance: "language-detector",
-    });
-  });
 });

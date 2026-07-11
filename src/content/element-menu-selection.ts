@@ -23,6 +23,9 @@ export const inspectMenuSelection = (
 ): ElementMenuSelection | Promise<ElementMenuSelection> => {
   const { record, settings } = inspection;
   const source = selectedSource(record, settings);
+  if (source === "auto" && (record.source.textContent ?? "") !== record.sourceFingerprint) {
+    record.refreshSource();
+  }
   if (source !== "auto" || record.detection.kind !== "not-detected") {
     return menuSelection(record, settings);
   }
@@ -34,7 +37,6 @@ const inspectAutomaticSource = async (
   inspection: ElementMenuInspection,
 ): Promise<ElementMenuSelection> => {
   const { engine, record, settings, store } = inspection;
-  if ((record.source.textContent ?? "") !== record.sourceFingerprint) record.refreshSource();
   const fingerprint = record.source.textContent ?? "";
   const existing = pendingInspections.get(record);
   const detectionPromise =

@@ -10,6 +10,19 @@ const complete: TabState = {
   failed: 0,
 };
 
+const createLiveChatState = () => {
+  const enabled = new Set<number>();
+  return {
+    async isEnabled(tabId: number): Promise<boolean> {
+      return enabled.has(tabId);
+    },
+    async setEnabled(tabId: number, value: boolean): Promise<void> {
+      if (value) enabled.add(tabId);
+      else enabled.delete(tabId);
+    },
+  };
+};
+
 describe("background coordinator", () => {
   it("stores tab state and returns it for the active tab", async () => {
     const broadcast = vi.fn();
@@ -17,6 +30,7 @@ describe("background coordinator", () => {
       activeTabId: async () => 7,
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
       broadcastSettings: broadcast,
       requestTabState: vi.fn(),
     });
@@ -30,6 +44,7 @@ describe("background coordinator", () => {
       activeTabId: async () => activeTab,
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn().mockRejectedValue(new Error("content unavailable")),
     });
@@ -46,6 +61,7 @@ describe("background coordinator", () => {
       activeTabId: async () => undefined,
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
       broadcastSettings: broadcast,
       requestTabState: vi.fn(),
     });
@@ -59,6 +75,7 @@ describe("background coordinator", () => {
       activeTabId: async () => 7,
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
       broadcastSettings: vi.fn(),
       requestTabState,
     });
@@ -73,6 +90,7 @@ describe("background coordinator", () => {
       activeTabId: async () => 7,
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn(),
     });
@@ -86,10 +104,12 @@ describe("background coordinator", () => {
   it("starts the top page and registered live chat", async () => {
     const sendToTop = vi.fn().mockResolvedValue(undefined);
     const sendToLiveChat = vi.fn();
+    const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => 7,
       sendToTop,
       sendToLiveChat,
+      liveChatState,
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn(),
     });
@@ -103,10 +123,12 @@ describe("background coordinator", () => {
   it("restores the top page and stops registered live chat", async () => {
     const sendToTop = vi.fn().mockResolvedValue(undefined);
     const sendToLiveChat = vi.fn();
+    const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => 7,
       sendToTop,
       sendToLiveChat,
+      liveChatState,
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn(),
     });
@@ -120,10 +142,12 @@ describe("background coordinator", () => {
   it("uses only registered live chat commands for a top-level live chat", async () => {
     const sendToTop = vi.fn().mockResolvedValue(undefined);
     const sendToLiveChat = vi.fn();
+    const liveChatState = createLiveChatState();
     const coordinator = createBackgroundCoordinator({
       activeTabId: async () => 7,
       sendToTop,
       sendToLiveChat,
+      liveChatState,
       hasTopLiveChat: () => true,
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn(),
@@ -135,5 +159,89 @@ describe("background coordinator", () => {
     expect(sendToTop).not.toHaveBeenCalled();
     expect(sendToLiveChat).toHaveBeenNthCalledWith(1, 7, { type: "start-live-chat" });
     expect(sendToLiveChat).toHaveBeenNthCalledWith(2, 7, { type: "stop-live-chat" });
+  });
+
+  it("replays a persisted live start when a valid endpoint registers after restart", async () => {
+    // Given
+    const liveChatState = createLiveChatState();
+    const first = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+    await first.receive({ type: "translate-page" });
+    const sendToLiveChat = vi.fn();
+    const restarted = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat,
+      liveChatState,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    await restarted.liveChatEndpointRegistered(7);
+
+    // Then
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "start-live-chat" });
+  });
+
+  it("does not replay a live start after restoration clears persisted intent", async () => {
+    // Given
+    const liveChatState = createLiveChatState();
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+    await coordinator.receive({ type: "translate-page" });
+    await coordinator.receive({ type: "restore-page" });
+    const sendToLiveChat = vi.fn();
+    const restarted = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat,
+      liveChatState,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    await restarted.liveChatEndpointRegistered(7);
+
+    // Then
+    expect(sendToLiveChat).not.toHaveBeenCalled();
+  });
+
+  it("persists live intent without sending a page command before endpoint registration", async () => {
+    // Given
+    const liveChatState = createLiveChatState();
+    const sendToTop = vi.fn().mockResolvedValue(undefined);
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      activeTabUrl: async () => "https://www.youtube.com/live_chat?v=fixture",
+      sendToTop,
+      sendToLiveChat,
+      liveChatState,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    await coordinator.receive({ type: "translate-page" });
+    await coordinator.liveChatEndpointRegistered(7);
+
+    // Then
+    expect(sendToTop).not.toHaveBeenCalled();
+    expect(await liveChatState.isEnabled(7)).toBe(true);
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "start-live-chat" });
   });
 });

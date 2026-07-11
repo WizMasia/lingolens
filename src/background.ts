@@ -1,4 +1,4 @@
-import { createFrameRegistry, type FrameEndpoint } from "./frame-registry";
+import { createFrameRegistry, type FrameEndpoint, isYouTubeLiveChatUrl } from "./frame-registry";
 import { parseMessage, type RuntimeMessage, type TabState } from "./shared/protocol";
 
 const IDLE_STATE: TabState = {
@@ -11,11 +11,18 @@ const IDLE_STATE: TabState = {
 
 export type BackgroundDependencies = Readonly<{
   activeTabId(): Promise<number | undefined>;
+  activeTabUrl?(): Promise<string | undefined>;
   sendToTop(tabId: number, message: RuntimeMessage): Promise<void>;
   sendToLiveChat(tabId: number, message: RuntimeMessage): void;
+  liveChatState: LiveChatStateStore;
   hasTopLiveChat?(tabId: number): boolean;
   broadcastSettings(): void;
   requestTabState(tabId: number): Promise<TabState>;
+}>;
+
+export type LiveChatStateStore = Readonly<{
+  isEnabled(tabId: number): Promise<boolean>;
+  setEnabled(tabId: number, enabled: boolean): Promise<void>;
 }>;
 
 export type BackgroundCoordinator = Readonly<{
@@ -24,6 +31,7 @@ export type BackgroundCoordinator = Readonly<{
     senderTabId?: number,
     senderFrameId?: number,
   ): Promise<TabState | undefined>;
+  liveChatEndpointRegistered(tabId: number): Promise<void>;
   removeTab(tabId: number): void;
   settingsChanged(): void;
 }>;
@@ -33,6 +41,8 @@ export const createBackgroundCoordinator = (
 ): BackgroundCoordinator => {
   const states = new Map<number, TabState>();
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
+  const isTopLiveChat = async (tabId: number): Promise<boolean> =>
+    hasTopLiveChat(tabId) || isYouTubeLiveChatUrl((await dependencies.activeTabUrl?.()) ?? "");
   return {
     async receive(value, senderTabId, senderFrameId) {
       const message = parseMessage(value);
@@ -63,7 +73,8 @@ export const createBackgroundCoordinator = (
         case "translate-page": {
           const tabId = await dependencies.activeTabId();
           if (tabId === undefined) return undefined;
-          if (!hasTopLiveChat(tabId)) {
+          await dependencies.liveChatState.setEnabled(tabId, true);
+          if (!(await isTopLiveChat(tabId))) {
             await dependencies.sendToTop(tabId, message);
           }
           dependencies.sendToLiveChat(tabId, { type: "start-live-chat" });
@@ -72,7 +83,8 @@ export const createBackgroundCoordinator = (
         case "restore-page": {
           const tabId = await dependencies.activeTabId();
           if (tabId === undefined) return undefined;
-          if (!hasTopLiveChat(tabId)) {
+          await dependencies.liveChatState.setEnabled(tabId, false);
+          if (!(await isTopLiveChat(tabId))) {
             await dependencies.sendToTop(tabId, message);
           }
           dependencies.sendToLiveChat(tabId, { type: "stop-live-chat" });
@@ -85,8 +97,14 @@ export const createBackgroundCoordinator = (
           return assertNever(message);
       }
     },
+    async liveChatEndpointRegistered(tabId) {
+      if (await dependencies.liveChatState.isEnabled(tabId)) {
+        dependencies.sendToLiveChat(tabId, { type: "start-live-chat" });
+      }
+    },
     removeTab(tabId) {
       states.delete(tabId);
+      void dependencies.liveChatState.setEnabled(tabId, false);
     },
     settingsChanged() {
       dependencies.broadcastSettings();
@@ -96,6 +114,23 @@ export const createBackgroundCoordinator = (
 
 const assertNever = (value: never): never => {
   throw new TypeError(`Unhandled message: ${String(value)}`);
+};
+
+const createLiveChatStateStore = (): LiveChatStateStore => {
+  const key = (tabId: number): string => `live-chat:${tabId}`;
+  return {
+    async isEnabled(tabId) {
+      const stored: Record<string, unknown> = await chrome.storage.session.get(key(tabId));
+      return stored[key(tabId)] === true;
+    },
+    async setEnabled(tabId, enabled) {
+      if (enabled) {
+        await chrome.storage.session.set({ [key(tabId)]: true });
+        return;
+      }
+      await chrome.storage.session.remove(key(tabId));
+    },
+  };
 };
 
 if (typeof chrome !== "undefined") {
@@ -111,8 +146,13 @@ if (typeof chrome !== "undefined") {
     sendToLiveChat(tabId, message) {
       frames.sendToLiveChat(tabId, message);
     },
+    liveChatState: createLiveChatStateStore(),
     hasTopLiveChat(tabId) {
       return frames.hasTopLiveChat(tabId);
+    },
+    async activeTabUrl() {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      return tab?.url;
     },
     broadcastSettings() {
       void chrome.tabs.query({}).then((tabs) => {
@@ -156,6 +196,9 @@ if (typeof chrome !== "undefined") {
       },
     };
     frames.add(endpoint);
+    if (isYouTubeLiveChatUrl(endpoint.url)) {
+      void coordinator.liveChatEndpointRegistered(endpoint.tabId);
+    }
     port.onDisconnect.addListener(() => frames.remove(endpoint));
   });
   chrome.tabs.onRemoved.addListener((tabId) => coordinator.removeTab(tabId));

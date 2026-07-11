@@ -24,6 +24,18 @@ export type ContentApp = Readonly<{
   destroy(): void;
 }>;
 
+export type ContentPort = Readonly<{
+  onMessage: Readonly<{ addListener(listener: (value: unknown) => void): void }>;
+  onDisconnect: Readonly<{ addListener(listener: () => void): void }>;
+  disconnect(): void;
+}>;
+
+export type ContentPortRuntime = Readonly<{
+  connect(options: Readonly<{ name: string }>): ContentPort;
+}>;
+
+export type ContentPortConnection = Readonly<{ destroy(): void }>;
+
 type LiveChatCommands = Readonly<{
   startLiveChat(): Promise<void>;
   stopLiveChat(): void;
@@ -35,6 +47,31 @@ export const eventElement = (event: Pick<Event, "composedPath" | "target">): Ele
   const composedTarget = event.composedPath().find((target) => target instanceof Element);
   if (composedTarget instanceof Element) return composedTarget;
   return event.target instanceof Element ? event.target : null;
+};
+
+export const connectContentPort = (
+  runtime: ContentPortRuntime,
+  app: ContentApp,
+): ContentPortConnection => {
+  let destroyed = false;
+  let currentPort: ContentPort | undefined;
+  const connect = (): void => {
+    const port = runtime.connect({ name: "lingolens-frame" });
+    currentPort = port;
+    port.onMessage.addListener((value) => {
+      void app.handleMessage(value);
+    });
+    port.onDisconnect.addListener(() => {
+      if (!destroyed) connect();
+    });
+  };
+  connect();
+  return {
+    destroy() {
+      destroyed = true;
+      currentPort?.disconnect();
+    },
+  };
 };
 
 export const createContentApp = (
@@ -204,15 +241,19 @@ if (typeof chrome !== "undefined") {
       isTopFrame: () => window.top === window,
     });
     chrome.runtime.onMessage.addListener((value: unknown) => app.handleMessage(value));
-    const port = chrome.runtime.connect({ name: "lingolens-frame" });
-    port.onMessage.addListener((value: unknown) => {
-      void app.handleMessage(value);
-    });
+    const connection = connectContentPort(
+      {
+        connect(options) {
+          return chrome.runtime.connect(options);
+        },
+      },
+      app,
+    );
     window.addEventListener(
       "pagehide",
       () => {
+        connection.destroy();
         app.destroy();
-        port.disconnect();
       },
       { once: true },
     );

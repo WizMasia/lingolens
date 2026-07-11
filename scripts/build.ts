@@ -10,6 +10,7 @@ await build({
     content: "src/content/index.ts",
     popup: "src/popup/popup.ts",
     options: "src/options/options.ts",
+    "nano-offscreen": "src/offscreen/nano-offscreen.ts",
   },
   bundle: true,
   outdir: "dist",
@@ -21,6 +22,7 @@ const staticCopies = [
   cp("src/manifest.json", "dist/manifest.json"),
   cp("src/popup/popup.html", "dist/popup.html"),
   cp("src/options/options.html", "dist/options.html"),
+  cp("src/offscreen/nano-offscreen.html", "dist/nano-offscreen.html"),
   cp("src/styles", "dist/styles", { recursive: true }),
 ];
 const iconCopies = existsSync("src/icons")

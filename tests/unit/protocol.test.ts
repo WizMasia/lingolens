@@ -14,6 +14,36 @@ describe("runtime message protocol", () => {
     expect(parseMessage({ type: "stop-live-chat" })).toEqual({ type: "stop-live-chat" });
   });
 
+  it("parses a Nano source detection request", () => {
+    expect(
+      parseMessage({ type: "detect-nano-source", text: "hola", context: "buenos días" }),
+    ).toEqual({
+      type: "detect-nano-source",
+      text: "hola",
+      context: "buenos días",
+    });
+  });
+
+  it("rejects a malformed Nano source detection request", () => {
+    expect(parseMessage({ type: "detect-nano-source", text: 3, context: "x" })).toBeUndefined();
+  });
+
+  it("rejects an oversized offscreen Nano detection request", () => {
+    expect(
+      parseMessage({ type: "offscreen-nano-detect", text: "x".repeat(1_001), context: "context" }),
+    ).toBeUndefined();
+  });
+
+  it("parses an offscreen Nano detection request", () => {
+    expect(
+      parseMessage({ type: "offscreen-nano-detect", text: "hola", context: "context" }),
+    ).toEqual({
+      type: "offscreen-nano-detect",
+      text: "hola",
+      context: "context",
+    });
+  });
+
   it("rejects a tab state with a malformed count", () => {
     expect(
       parseMessage({

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBackgroundCoordinator } from "../../src/background";
+import type { NanoOffscreenBridge } from "../../src/background/nano-offscreen-bridge";
+import type { NanoLanguageDecision } from "../../src/content/nano-language-detector";
 import type { TabState } from "../../src/shared/protocol";
 
 const complete: TabState = {
@@ -22,6 +24,17 @@ const createLiveChatState = () => {
     },
   };
 };
+
+const createNanoBridge = (): NanoOffscreenBridge => ({
+  detect: vi.fn(
+    async (): Promise<NanoLanguageDecision> => ({
+      kind: "detected",
+      language: "es",
+      confidence: 0.9,
+    }),
+  ),
+  close: vi.fn(async () => undefined),
+});
 
 describe("background coordinator", () => {
   it("stores tab state and returns it for the active tab", async () => {
@@ -67,6 +80,52 @@ describe("background coordinator", () => {
     });
     coordinator.settingsChanged();
     expect(broadcast).toHaveBeenCalledOnce();
+  });
+
+  it("forwards a Nano source request to the offscreen bridge", async () => {
+    // Given
+    const nanoBridge = createNanoBridge();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => undefined,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const result = coordinator.receive({
+      type: "detect-nano-source",
+      text: "hola",
+      context: "context",
+    });
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "detected", language: "es", confidence: 0.9 });
+    expect(nanoBridge.detect).toHaveBeenCalledWith({ text: "hola", context: "context" });
+  });
+
+  it("closes the Nano offscreen bridge when a tab is removed", async () => {
+    // Given
+    const nanoBridge = createNanoBridge();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => undefined,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    coordinator.removeTab(7);
+    await Promise.resolve();
+
+    // Then
+    expect(nanoBridge.close).toHaveBeenCalledOnce();
   });
 
   it("recovers live state from the active content script after a worker restart", async () => {

@@ -152,6 +152,8 @@ export const createContentApp = (
           dependencies.controller.applySettings(next);
         });
       case "tab-state":
+      case "detect-nano-source":
+      case "offscreen-nano-detect":
         return undefined;
       default:
         return assertNever(message);

@@ -147,7 +147,7 @@ export const createTranslationController = (
       return record.phase === "error" || record.phase === "stale" ? "failed" : "skipped";
     },
     onStale(record) {
-      view.markStale(record);
+      (liveChatRecords.has(record) ? liveChatView : view).markStale(record);
     },
     onState: dependencies.onState ?? (() => undefined),
   });

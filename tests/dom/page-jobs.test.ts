@@ -134,6 +134,12 @@ describe("full-page controller", () => {
     expect(first.textContent).toBe("번역:First");
     first.dispatchEvent(new Event("pointerleave"));
     expect(first.textContent).toBe("First");
+    first.textContent = "Updated";
+    await flushMutations();
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    expect(first.textContent).toBe("Updated");
+    first.dispatchEvent(new Event("pointerenter"));
+    expect(first.textContent).toBe("Updated");
 
     // When
     appendLiveChatMessage(items, "Second");

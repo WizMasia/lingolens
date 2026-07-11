@@ -44,13 +44,7 @@ const SETTINGS: Settings = {
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };
 
-type LiveChatController = TranslationController &
-  Readonly<{
-    startLiveChat(): Promise<void>;
-    stopLiveChat(): void;
-  }>;
-
-const controllerFixture = (settings: Settings = SETTINGS): LiveChatController => ({
+const controllerFixture = (settings: Settings = SETTINGS): TranslationController => ({
   settings,
   store: {
     active: new Set(),

@@ -69,8 +69,87 @@ const addSources = (...texts: readonly string[]): readonly HTMLElement[] =>
     return source;
   });
 
+const flushMutations = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+const appendLiveChatMessage = (items: HTMLElement, text: string): HTMLElement => {
+  const renderer = document.createElement("yt-live-chat-text-message-renderer");
+  const message = document.createElement("span");
+  message.id = "message";
+  message.textContent = text;
+  renderer.append(message);
+  items.append(renderer);
+  return message;
+};
+
+const createLiveChat = (): HTMLElement => {
+  const listRenderer = document.createElement("yt-live-chat-item-list-renderer");
+  const items = document.createElement("div");
+  items.id = "items";
+  listRenderer.append(items);
+  document.body.append(listRenderer);
+  return items;
+};
+
 describe("full-page controller", () => {
-  beforeEach(() => document.body.replaceChildren());
+  beforeEach(() => {
+    document.body.replaceChildren();
+    testWindow.location.href = "https://example.test/";
+  });
+
+  it("renders live chat translations on hover and stops them on restoration", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const first = appendLiveChatMessage(items, "First");
+    const requests: string[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request.text);
+        return translated(`번역:${request.text}`);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.startLiveChat();
+    await flushMutations();
+
+    // Then
+    expect(requests).toEqual(["First"]);
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    controller.applySettings({ ...SETTINGS, displayMode: "hover" });
+    controller.applySettings(SETTINGS);
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+    first.dispatchEvent(new Event("pointerenter"));
+    expect(first.textContent).toBe("번역:First");
+    first.dispatchEvent(new Event("pointerleave"));
+    expect(first.textContent).toBe("First");
+
+    // When
+    appendLiveChatMessage(items, "Second");
+    await flushMutations();
+
+    // Then
+    expect(requests).toEqual(["First", "Second"]);
+
+    // When
+    controller.restorePage();
+    appendLiveChatMessage(items, "Third");
+    await flushMutations();
+
+    // Then
+    expect(requests).toEqual(["First", "Second"]);
+  });
 
   it("reports partial failure while allowing successful peers to finish", async () => {
     // Given

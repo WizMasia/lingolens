@@ -81,4 +81,75 @@ describe("background live replay races", () => {
     expect(sendToTop).not.toHaveBeenCalled();
     expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "start-live-chat" });
   });
+
+  it("keeps restore last when start persistence races restoration", async () => {
+    // Given
+    const startWrite = deferred<void>();
+    const startWriteStarted = deferred<void>();
+    let enabled = false;
+    const messages: string[] = [];
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat(_tabId, message) {
+        messages.push(message.type);
+      },
+      liveChatState: {
+        async isEnabled() {
+          return enabled;
+        },
+        async setEnabled(_tabId, value) {
+          if (value) {
+            startWriteStarted.resolve();
+            await startWrite.promise;
+          }
+          enabled = value;
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    await startWriteStarted.promise;
+    const restore = coordinator.receive({ type: "restore-page" });
+    startWrite.resolve();
+    await Promise.all([start, restore]);
+
+    // Then
+    expect(messages).toEqual(["start-live-chat", "stop-live-chat"]);
+    expect(enabled).toBe(false);
+  });
+
+  it("continues with restoration after a queued start fails", async () => {
+    // Given
+    const sendToLiveChat = vi.fn();
+    let writes = 0;
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat,
+      liveChatState: {
+        async isEnabled() {
+          return false;
+        },
+        async setEnabled(_tabId, enabled) {
+          writes += 1;
+          if (enabled && writes === 1) throw new Error("start persistence failed");
+        },
+      },
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const start = coordinator.receive({ type: "translate-page" });
+    const restore = coordinator.receive({ type: "restore-page" });
+
+    // Then
+    await expect(start).rejects.toThrow("start persistence failed");
+    await expect(restore).resolves.toBeUndefined();
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "stop-live-chat" });
+  });
 });

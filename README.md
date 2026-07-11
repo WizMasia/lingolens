@@ -1,16 +1,20 @@
-# Local Page Translator
+# LingoLens
 
-Local Page Translator is a Chrome extension that translates ordinary web-page text with Chrome's on-device Language Detector and Translator APIs. Page text is not sent by this extension to a cloud translation service.
+LingoLens is a Chrome extension for translating ordinary HTTP and HTTPS web-page text with Chrome-managed, on-device language detection and translation models. It keeps translation work in the browser rather than sending page text to a LingoLens translation service.
+
+**Why LingoLens?** “Lingo” evokes language. It also deliberately echoes *ringo* (りんご), the Japanese word for apple, matching the apple-frame icon. “Lingo” itself does not mean apple in Japanese.
+
+한국어 빠른 사용법은 [README.ko.md](README.ko.md)에서 볼 수 있습니다.
 
 ## Requirements
 
-- Chrome 138 or newer on desktop.
-- A device and Chrome installation eligible for the built-in AI APIs.
-- An unmetered connection for the first download of the language detector or a language-pair model. After the required models are present, translation can run offline.
+- Chrome 138 or later on desktop.
+- A Chrome installation and device for which Chrome makes the Language Detector and Translator APIs available.
+- Network access when Chrome needs to acquire a detector or language-pair model for the first time. Chrome manages availability and acquisition; LingoLens cannot make an unavailable model or pair available.
 
-The extension does not support Chrome mobile, browser-internal pages, the Chrome Web Store, PDF viewer internals, cross-origin iframe contents, images, video subtitles, code blocks, or editable fields.
+After Chrome has acquired a needed model, translation may work without a network connection. This is not a promise that every device, language pair, or browser installation is available offline.
 
-## Build and install
+## Install an unpacked build
 
 ```bash
 bun install
@@ -20,39 +24,37 @@ bun run build
 ```
 
 1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Choose **Load unpacked** and select the generated `dist` directory.
-4. Pin **Local Page Translator** if you want the page controls always visible.
+2. Turn on **Developer mode**.
+3. Select **Load unpacked** and choose the generated `dist` directory.
+4. Pin **LingoLens** if you want the page controls readily available.
 
-## Use
+## Use LingoLens
 
-- Open the toolbar popup and select **페이지 전체 번역** to translate the current page.
-- Select **원문 복원** to remove every translation created by the extension.
-- By default, press `Ctrl` while text is selected or while the pointer is over a text element to translate that element.
-- Press the translation trigger again on an already translated element to restore its original text. Press the menu trigger (`Ctrl+Shift` by default) to select explicit source and target languages; the floating menu also shows the language detected for that element.
-- Open **설정** to choose inline or hover replacement display, a fixed source or automatic per-element detection, a browser-default or fixed target, and independent translation and menu shortcuts.
+- **Full page:** open the toolbar popup, choose **페이지 전체 번역**, and use **원문 복원** to remove translations made by LingoLens.
+- **An element:** by default, press `Ctrl` while text is selected or while the pointer is over a text element. Use the same trigger again to restore that element.
+- **Retranslation and language menu:** press the language-menu trigger (`Ctrl + Shift` by default) over an eligible element. The floating menu lets you choose source and target languages, shows the detected source, and offers **Translate again** or restore.
+- **Inline or hover display:** open **설정** and choose **원문 아래 표시** to add a translation after the source text, or **호버 시 교체** to show the translation while the element is hovered or focused.
+- **Language and shortcut settings:** in **번역 설정**, choose **입력 언어**, **도착 언어**, **번역 토글 키**, and **언어 메뉴 키**, then select **설정 저장**.
 
-Automatic detection is less reliable for single words. The extension uses an explicit `lang` attribute and nearby text as hints; when confidence is still low, choose the source language from the element menu.
+Automatic detection can be uncertain for short text. If LingoLens asks for a language or chooses poorly, open the element language menu and select an explicit source language.
 
-## Privacy and permissions
+LingoLens does not run on browser-internal pages, the Chrome Web Store, PDF viewer internals, images, video subtitles, code blocks, editable fields, or cross-origin iframe content.
 
-The extension requests access to HTTP and HTTPS pages because the configurable element trigger must work before the toolbar is clicked. It also requests `storage` to synchronize settings. It requests no translation-service host permission, injects no remote code, and includes no analytics or telemetry.
+## YouTube Live Chat status
 
-Chrome manages the local detector and translation models. Use `chrome://on-device-internals` to inspect on-device model status when a model does not download or initialize.
+YouTube Live Chat is a planned, YouTube-only MVP and is not included in this release. LingoLens does not claim support for other live-chat services.
 
-## Acceptance fixture
+## Model and language-pair limits
 
-Serve the repository so Chrome treats the fixture as an ordinary page:
+Chrome decides whether its on-device AI APIs and a requested source-to-target pair are available, downloadable, downloading, or unavailable. A supported Chrome version alone does not guarantee a model or pair. If a model cannot initialize, update Chrome, check device eligibility, allow Chrome to complete any required acquisition, and inspect `chrome://on-device-internals` where available.
 
-```bash
-python3 -m http.server 4173
-```
+## Release and project documents
 
-Then open `http://localhost:4173/tests/fixtures/mixed-language.html`. The page contains mixed languages, RTL text, nested markup, excluded editable/code content, source mutation, and appended content for manual verification.
-
-## Troubleshooting
-
-- **Unsupported page:** navigate to an ordinary `http://` or `https://` page; Chrome blocks content scripts on protected pages.
-- **Model unavailable:** update Chrome, confirm hardware eligibility in `chrome://on-device-internals`, and allow the first model download on an unmetered connection.
-- **Short text asks for a language:** choose an explicit source language from the translated element's language control.
-- **A site consumes the trigger:** select another combination in settings or use the popup's full-page action.
+- [License](LICENSE)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [Privacy policy](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Changelog](CHANGELOG.md)
+- [Public release checklist](docs/public-release-checklist.md)

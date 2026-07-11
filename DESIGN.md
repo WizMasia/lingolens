@@ -1,4 +1,4 @@
-# Local Page Translator Design System
+# LingoLens Design System
 
 ## 0. Research Log
 

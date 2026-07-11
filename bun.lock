@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "local-page-translator",
+      "name": "lingolens",
       "dependencies": {
         "esbuild": "^0.28.1",
       },

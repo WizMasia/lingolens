@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true">
+  <rect width="512" height="512" rx="96" fill="#f7f4ec" />
+  <g fill="none" stroke="#17201b" stroke-linecap="round" stroke-linejoin="round" stroke-width="28">
+    <path id="apple-lens" d="M164 184c-19-29-62-29-84 2-38 53-4 137 52 153 12 3 24 3 32 0 56-16 90-100 52-153-22-31-65-31-84-2" />
+    <use href="#apple-lens" transform="translate(512 0) scale(-1 1)" />
+    <path d="M216 253h80" />
+  </g>
+  <path d="M239 152c4-33 30-51 62-43-5 30-31 47-62 43Z" fill="#2f6d4f" />
+</svg>

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Local Page Translator",
+  "name": "LingoLens",
   "version": "0.1.0",
   "description": "Private, on-device page translation for Chrome.",
   "minimum_chrome_version": "138",
@@ -8,7 +8,7 @@
   "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Local Page Translator",
+    "default_title": "LingoLens",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"

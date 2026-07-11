@@ -223,6 +223,33 @@ describe("content entry", () => {
     expect(controller.stopLiveChat).toHaveBeenCalledOnce();
   });
 
+  it("leaves page handlers off in a child frame while routing live commands", async () => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Meaningful text to translate";
+    document.body.append(paragraph);
+    const controller = controllerFixture();
+    const app = createContentApp(document, {
+      controller,
+      loadSettings: async () => SETTINGS,
+      isTrustedEvent: () => true,
+      isTopFrame: () => false,
+    });
+    apps.push(app);
+
+    paragraph.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    paragraph.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Control", ctrlKey: true, bubbles: true }),
+    );
+    paragraph.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", bubbles: true }));
+    await app.handleMessage({ type: "start-live-chat" });
+    app.handleMessage({ type: "stop-live-chat" });
+
+    expect(controller.setHovered).not.toHaveBeenCalled();
+    expect(controller.translateTarget).not.toHaveBeenCalled();
+    expect(controller.startLiveChat).toHaveBeenCalledOnce();
+    expect(controller.stopLiveChat).toHaveBeenCalledOnce();
+  });
+
   it("provides the production controller with the full language catalog", () => {
     const languages = productionLanguages();
     expect(languages.length).toBeGreaterThan(10);

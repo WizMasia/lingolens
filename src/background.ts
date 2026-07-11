@@ -19,7 +19,11 @@ export type BackgroundDependencies = Readonly<{
 }>;
 
 export type BackgroundCoordinator = Readonly<{
-  receive(value: unknown, senderTabId?: number): Promise<TabState | undefined>;
+  receive(
+    value: unknown,
+    senderTabId?: number,
+    senderFrameId?: number,
+  ): Promise<TabState | undefined>;
   removeTab(tabId: number): void;
   settingsChanged(): void;
 }>;
@@ -30,12 +34,14 @@ export const createBackgroundCoordinator = (
   const states = new Map<number, TabState>();
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
   return {
-    async receive(value, senderTabId) {
+    async receive(value, senderTabId, senderFrameId) {
       const message = parseMessage(value);
       if (message === undefined) return undefined;
       switch (message.type) {
         case "tab-state":
-          if (senderTabId !== undefined) states.set(senderTabId, message.state);
+          if (senderTabId !== undefined && senderFrameId === 0) {
+            states.set(senderTabId, message.state);
+          }
           return undefined;
         case "get-tab-state": {
           const tabId = await dependencies.activeTabId();
@@ -130,7 +136,7 @@ if (typeof chrome !== "undefined") {
     },
   });
   chrome.runtime.onMessage.addListener((value: unknown, sender) =>
-    coordinator.receive(value, sender.tab?.id),
+    coordinator.receive(value, sender.tab?.id, sender.frameId),
   );
   chrome.runtime.onConnect.addListener((port) => {
     const sender = port.sender;

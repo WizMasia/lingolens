@@ -20,7 +20,7 @@ describe("background coordinator", () => {
       broadcastSettings: broadcast,
       requestTabState: vi.fn(),
     });
-    coordinator.receive({ type: "tab-state", state: complete }, 7);
+    coordinator.receive({ type: "tab-state", state: complete }, 7, 0);
     await expect(coordinator.receive({ type: "get-tab-state" })).resolves.toEqual(complete);
   });
 
@@ -33,7 +33,7 @@ describe("background coordinator", () => {
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn().mockRejectedValue(new Error("content unavailable")),
     });
-    coordinator.receive({ type: "tab-state", state: complete }, 8);
+    coordinator.receive({ type: "tab-state", state: complete }, 8, 0);
     coordinator.removeTab(8);
     expect(await coordinator.receive({ type: "get-tab-state" })).toMatchObject({ phase: "idle" });
     activeTab = 9;
@@ -65,6 +65,22 @@ describe("background coordinator", () => {
 
     await expect(coordinator.receive({ type: "get-tab-state" })).resolves.toEqual(complete);
     expect(requestTabState).toHaveBeenCalledWith(7);
+  });
+
+  it("does not let a child frame overwrite top-frame tab state", async () => {
+    const childState: TabState = { ...complete, phase: "translating", completed: 1 };
+    const coordinator = createBackgroundCoordinator({
+      activeTabId: async () => 7,
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    await coordinator.receive({ type: "tab-state", state: complete }, 7, 0);
+    await coordinator.receive({ type: "tab-state", state: childState }, 7, 2);
+
+    await expect(coordinator.receive({ type: "get-tab-state" })).resolves.toEqual(complete);
   });
 
   it("starts the top page and registered live chat", async () => {

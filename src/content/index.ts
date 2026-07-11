@@ -16,6 +16,7 @@ export type ContentDependencies = Readonly<{
   controller: TranslationController;
   loadSettings(): Promise<Settings>;
   isTrustedEvent?(event: Event): boolean;
+  isTopFrame?(): boolean;
 }>;
 
 export type ContentApp = Readonly<{
@@ -43,6 +44,7 @@ export const createContentApp = (
   let settings = dependencies.controller.settings;
   let currentTarget: HTMLElement | null = null;
   let pendingAction: ShortcutAction | null = null;
+  const installsPageHandlers = dependencies.isTopFrame?.() ?? true;
 
   const isTrustedEvent = (event: Event): boolean =>
     dependencies.isTrustedEvent?.(event) ?? event.isTrusted;
@@ -119,19 +121,23 @@ export const createContentApp = (
     }
   };
 
-  document.addEventListener("pointerover", onPointer, true);
-  document.addEventListener("keydown", onKey, true);
-  document.addEventListener("keyup", onKeyUp, true);
-  void dependencies.loadSettings().then((loaded) => {
-    settings = loaded;
-    dependencies.controller.applySettings(loaded);
-  });
+  if (installsPageHandlers) {
+    document.addEventListener("pointerover", onPointer, true);
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    void dependencies.loadSettings().then((loaded) => {
+      settings = loaded;
+      dependencies.controller.applySettings(loaded);
+    });
+  }
   return {
     handleMessage,
     destroy() {
-      document.removeEventListener("pointerover", onPointer, true);
-      document.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("keyup", onKeyUp, true);
+      if (installsPageHandlers) {
+        document.removeEventListener("pointerover", onPointer, true);
+        document.removeEventListener("keydown", onKey, true);
+        document.removeEventListener("keyup", onKeyUp, true);
+      }
       dependencies.controller.destroy();
     },
   };
@@ -192,7 +198,11 @@ if (typeof chrome !== "undefined") {
         void chrome.runtime.sendMessage({ type: "tab-state", state });
       },
     });
-    const app = createContentApp(document, { controller, loadSettings });
+    const app = createContentApp(document, {
+      controller,
+      loadSettings,
+      isTopFrame: () => window.top === window,
+    });
     chrome.runtime.onMessage.addListener((value: unknown) => app.handleMessage(value));
     const port = chrome.runtime.connect({ name: "lingolens-frame" });
     port.onMessage.addListener((value: unknown) => {

@@ -35,7 +35,7 @@ describe("Nano offscreen response parser", () => {
     );
 
     // Then
-    await expect(rejected).resolves.toBeUndefined();
+    expect(rejected).toBeUndefined();
     await expect(accepted).resolves.toEqual({ kind: "unavailable" });
     expect(detect).toHaveBeenCalledOnce();
   });

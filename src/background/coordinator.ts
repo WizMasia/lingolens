@@ -201,6 +201,7 @@ export const createBackgroundCoordinator = (
         (intent ?? (await dependencies.liveChatState.isEnabled(tabId))) &&
         generation === liveChatIntent.generation(tabId)
       ) {
+        if (intent === undefined) liveChatIntent.start(tabId);
         dependencies.sendToLiveChat(tabId, { type: "start-live-chat" });
       }
     },

@@ -302,6 +302,35 @@ describe("background coordinator", () => {
     expect(requestTabState).toHaveBeenCalledWith(7);
   });
 
+  it("restores Nano eligibility when a persisted live chat endpoint reconnects", async () => {
+    const nanoBridge = createNanoBridge();
+    const liveChatState = createLiveChatState();
+    await liveChatState.setEnabled(7, true);
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState,
+      nanoBridge,
+      isLiveChatSender: () => true,
+      isNanoAuthorizationSender: () => true,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    await coordinator.liveChatEndpointRegistered(7);
+    await coordinator.receive(
+      { type: "nano-session-authorized" },
+      undefined,
+      undefined,
+      "chrome-extension://fixture/options.html",
+    );
+
+    await expect(
+      coordinator.receive({ type: "detect-nano-source", text: "hola", context: "context" }, 7, 2),
+    ).resolves.toEqual({ kind: "detected", language: "es", confidence: 0.9 });
+  });
+
   it("does not let a child frame overwrite top-frame tab state", async () => {
     const childState: TabState = { ...complete, phase: "translating", completed: 1 };
     const coordinator = createBackgroundCoordinator({

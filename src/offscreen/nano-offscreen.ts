@@ -20,7 +20,7 @@ export type NanoMessageSender = Readonly<{ url?: string }>;
 export type NanoOffscreenMessageHandler = (
   value: unknown,
   sender: NanoMessageSender,
-) => Promise<NanoLanguageDecision | undefined>;
+) => Promise<NanoLanguageDecision> | undefined;
 
 export type NanoOffscreenMessageHandlerDependencies = Readonly<{
   detect(text: string, context: string): Promise<NanoLanguageDecision>;
@@ -65,7 +65,7 @@ const promptFor = (text: string, context: string): string =>
 
 export const createNanoOffscreenMessageHandler =
   (dependencies: NanoOffscreenMessageHandlerDependencies): NanoOffscreenMessageHandler =>
-  async (value, sender) => {
+  (value, sender) => {
     const message = parseMessage(value);
     if (message?.type !== "offscreen-nano-detect" || !dependencies.isBackgroundSender(sender)) {
       return undefined;

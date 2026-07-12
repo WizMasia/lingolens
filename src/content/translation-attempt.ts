@@ -14,7 +14,11 @@ import { collectSourceText } from "./targets";
 
 export type TranslationAttempt = Readonly<{
   source: HTMLElement;
-  preference: SourcePreference;
+  preference: SourcePreference &
+    Readonly<{
+      knownDetection?: AutomaticDetectionEvidence;
+      nanoAllowed?: true;
+    }>;
   target: string;
   signal?: AbortSignal;
 }>;
@@ -102,8 +106,18 @@ const translationRequest = (
   if (attempt.preference.kind === "fixed") {
     return { text, source: attempt.preference, target: attempt.target };
   }
+  const knownDetection = attempt.preference.knownDetection ?? automaticEvidence(record);
   return {
-    ...sourceDetectionRequest(attempt.source, text, automaticEvidence(record)),
+    ...sourceDetectionRequest(
+      attempt.source,
+      text,
+      knownDetection === undefined
+        ? { ...(attempt.preference.nanoAllowed === true ? { nanoAllowed: true } : {}) }
+        : {
+            knownDetection,
+            ...(attempt.preference.nanoAllowed === true ? { nanoAllowed: true } : {}),
+          },
+    ),
     target: attempt.target,
   };
 };
@@ -111,7 +125,10 @@ const translationRequest = (
 export const sourceDetectionRequest = (
   source: HTMLElement,
   text: string,
-  knownDetection?: AutomaticDetectionEvidence,
+  hints: Readonly<{
+    knownDetection?: AutomaticDetectionEvidence;
+    nanoAllowed?: true;
+  }> = {},
 ): SourceDetectionRequest => {
   const languageHint = nearestLanguage(source);
   const context = nearbyContext(source, text);
@@ -121,7 +138,8 @@ export const sourceDetectionRequest = (
       kind: "auto",
       ...(languageHint === undefined ? {} : { languageHint }),
       ...(context.length === 0 ? {} : { context }),
-      ...(knownDetection === undefined ? {} : { knownDetection }),
+      ...(hints.knownDetection === undefined ? {} : { knownDetection: hints.knownDetection }),
+      ...(hints.nanoAllowed === true ? { nanoAllowed: true } : {}),
     },
   };
 };

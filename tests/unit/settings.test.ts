@@ -11,14 +11,28 @@ describe("settings", () => {
     expect(resolveBrowserTarget("pt-BR")).toBe("pt");
   });
 
-  it("defaults to automatic source, browser target, hover, and Control", () => {
+  it("defaults Nano assistance to disabled with automatic source, browser target, hover, and Control", () => {
     expect(parseSettings(undefined, "ko-KR")).toEqual({
       displayMode: "hover",
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: "ko" },
+      liveChatNanoEnabled: false,
       trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
       menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
     });
+  });
+
+  it("enables Nano assistance only for a literal true setting", () => {
+    // Given
+    const enabled = { liveChatNanoEnabled: true };
+
+    // When
+    const parsedEnabled = parseSettings(enabled, "ko-KR");
+    const parsedString = parseSettings({ liveChatNanoEnabled: "true" }, "ko-KR");
+
+    // Then
+    expect(parsedEnabled.liveChatNanoEnabled).toBe(true);
+    expect(parsedString.liveChatNanoEnabled).toBe(false);
   });
 
   it("preserves a legacy translation trigger and supplies the menu default", () => {

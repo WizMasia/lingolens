@@ -8,6 +8,8 @@ import type {
 } from "../../src/content/ai-engine";
 import { TranslationError } from "../../src/content/ai-engine";
 import { createTranslationController } from "../../src/content/controller";
+import { createLiveChatSessionController } from "../../src/content/live-chat-session-controller";
+import { createRecordStore } from "../../src/content/records";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -33,6 +35,7 @@ const SETTINGS: Settings = {
   displayMode: "inline",
   source: { kind: "auto" },
   target: { kind: "browser", resolvedLanguage: "ko" },
+  liveChatNanoEnabled: false,
   trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };
@@ -74,8 +77,14 @@ const flushMutations = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-const appendLiveChatMessage = (items: HTMLElement, text: string): HTMLElement => {
+const appendLiveChatMessage = (items: HTMLElement, text: string, author?: string): HTMLElement => {
   const renderer = document.createElement("yt-live-chat-text-message-renderer");
+  if (author !== undefined) {
+    const authorName = document.createElement("a");
+    authorName.id = "author-name";
+    authorName.href = author;
+    renderer.append(authorName);
+  }
   const message = document.createElement("span");
   message.id = "message";
   message.textContent = text;
@@ -188,6 +197,253 @@ describe("full-page controller", () => {
     message.dispatchEvent(new Event("pointerleave"));
     message.dispatchEvent(new Event("pointerenter"));
     expect(message.textContent).toBe("First");
+  });
+
+  it("reuses a fixed source only for later messages from the selected author", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const authorOneChoice = appendLiveChatMessage(items, "namaste", "/channel/one");
+    const requests: TranslationRequest[] = [];
+    const laterRequests = deferred<void>();
+    let trackLaterRequests = false;
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        if (trackLaterRequests && requests.length === 2) laterRequests.resolve();
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    await controller.retranslate(authorOneChoice, { source: "hi", target: "ko" });
+    requests.length = 0;
+    trackLaterRequests = true;
+
+    // When
+    appendLiveChatMessage(items, "namaste", "/channel/one");
+    appendLiveChatMessage(items, "namaste", "/channel/two");
+    await laterRequests.promise;
+
+    // Then
+    expect(requests).toContainEqual(
+      expect.objectContaining({ source: { kind: "fixed", language: "hi" } }),
+    );
+    expect(requests.map(({ source }) => source.kind)).toContain("auto");
+  });
+
+  it("does not apply an author choice to a message already queued", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const first = appendLiveChatMessage(items, "first", "/channel/one");
+    const queued = appendLiveChatMessage(items, "queued", "/channel/one");
+    const firstResult = deferred<TranslationResult>();
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      translate(request) {
+        requests.push(request);
+        return request.text === "first"
+          ? firstResult.promise
+          : Promise.resolve(translated(request.text));
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    expect(requests).toHaveLength(1);
+
+    // When
+    await controller.retranslate(queued, { source: "hi", target: "ko" });
+    firstResult.resolve(translated("first"));
+    await flushMutations();
+    await flushMutations();
+    await flushMutations();
+
+    // Then
+    const queuedRequest = requests.find((request, index) => index > 1 && request.text === "queued");
+    expect(queuedRequest?.source).toMatchObject({ kind: "auto" });
+    expect(first.textContent).toBe("first");
+  });
+
+  it("caches an automatic live-chat decision by unchanged message text", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    appendLiveChatMessage(items, "same text", "/channel/one");
+    appendLiveChatMessage(items, "same text", "/channel/two");
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.startLiveChat();
+    await flushMutations();
+    await flushMutations();
+    await flushMutations();
+
+    // Then
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.source).toMatchObject({
+      kind: "auto",
+      knownDetection: { kind: "detected", language: "en", provenance: "language-detector" },
+    });
+  });
+
+  it("propagates Nano authorization from live-chat recovery through the queued translation", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    appendLiveChatMessage(items, "romanized message");
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "es", provenance: "gemini-nano" };
+      },
+      async translate(request) {
+        requests.push(request);
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.startLiveChat();
+    await flushMutations();
+
+    // Then
+    expect(requests[0]?.source).toMatchObject({ kind: "auto", nanoAllowed: true });
+  });
+
+  it.each(["stop", "destroy"])("clears cached live-chat detection on %s", async (method) => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    appendLiveChatMessage(items, "same message");
+    const store = createRecordStore();
+    const preferences: TranslationRequest["source"][] = [];
+    const session = createLiveChatSessionController({
+      document,
+      store,
+      settings: () => SETTINGS,
+      async translate(source, preference) {
+        preferences.push(preference);
+        store.getOrCreate(source).setDetection({
+          kind: "detected",
+          language: "en",
+          provenance: "language-detector",
+        });
+      },
+      syncRecords() {},
+    });
+    await session.start();
+    await flushMutations();
+    if (method === "stop") session.stop();
+    else session.destroy();
+    await session.start();
+
+    // When
+    appendLiveChatMessage(items, "same message");
+    await flushMutations();
+
+    // Then
+    expect(preferences[1]).toMatchObject({ kind: "auto" });
+    expect(preferences[1]).not.toMatchObject({ knownDetection: expect.anything() });
+  });
+
+  it("keeps immediate live-chat retranslation hover-only when page mode is inline", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const message = appendLiveChatMessage(items, "namaste", "/channel/one");
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        return translated(`번역:${request.text}`);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.retranslate(message, { source: "hi", target: "ko" });
+
+    // Then
+    expect(document.querySelector('[data-local-translator-ui="inline"]')).toBeNull();
+  });
+
+  it("clears a remembered source when restoring a selected live-chat element", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    const selected = appendLiveChatMessage(items, "namaste", "/channel/one");
+    const requests: TranslationRequest[] = [];
+    const nextRequest = deferred<void>();
+    let awaitNextRequest = false;
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "en", provenance: "language-detector" };
+      },
+      async translate(request) {
+        requests.push(request);
+        if (awaitNextRequest) nextRequest.resolve();
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+    await controller.startLiveChat();
+    await flushMutations();
+    await controller.retranslate(selected, { source: "hi", target: "ko" });
+    controller.restoreElement(selected);
+    requests.length = 0;
+    awaitNextRequest = true;
+
+    // When
+    appendLiveChatMessage(items, "namaste", "/channel/one");
+    await nextRequest.promise;
+
+    // Then
+    expect(requests[0]?.source).toMatchObject({ kind: "auto" });
   });
 
   it("reports partial failure while allowing successful peers to finish", async () => {

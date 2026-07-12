@@ -18,6 +18,7 @@ export type Settings = Readonly<{
   displayMode: DisplayMode;
   source: SourcePreference;
   target: TargetPreference;
+  liveChatNanoEnabled: boolean;
   trigger: TriggerBinding;
   menuTrigger: TriggerBinding;
 }>;
@@ -118,6 +119,7 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
       displayMode: "hover",
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
+      liveChatNanoEnabled: false,
       trigger: DEFAULT_TRIGGER,
       menuTrigger: DEFAULT_MENU_TRIGGER,
     };
@@ -142,6 +144,7 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
       "target" in value
         ? parseTarget(value.target, uiLanguage)
         : { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
+    liveChatNanoEnabled: "liveChatNanoEnabled" in value && value.liveChatNanoEnabled === true,
     trigger,
     menuTrigger,
   };

@@ -46,6 +46,14 @@ LingoLens includes an experimental, YouTube-only Live Chat MVP. When you use **í
 
 Only YouTube `live_chat` frames are handled. The extension does not claim support for other live-chat services, chat composer text, paid/membership UI, or non-message page content. This experimental path still requires final manual acceptance on a real public chat before a public release.
 
+### Experimental live-chat language assistance
+
+Experimental live-chat language assistance is opt-in and disabled by default. It is an on-device classifier, not a translator: it can help choose a likely source language for eligible normal YouTube Live Chat messages, while LingoLens still uses Chrome's translation model for translation. Enable **Gemini Nano language assistance** in Settings, save the setting, and explicitly click Prepare before it can be used in the current extension session; Chrome may download its Chrome-managed model during preparation.
+
+The preparation authorization is intentionally session-only. After the extension worker restarts, click Prepare again before Nano assistance can run; LingoLens never starts a new model download automatically.
+
+Nano prompts stay inside Chrome. The assistance is experimental, can be unavailable or inaccurate, and does not guarantee romanized Hindi. Use the configured language-menu shortcut to choose Hindi or another Chrome Translator-supported source language for an author when automatic assistance is uncertain. Romanized Urdu cannot be recovered while Chrome Translator has no supported Urdu pair.
+
 ## Model and language-pair limits
 
 Chrome decides whether its on-device AI APIs and a requested source-to-target pair are available, downloadable, downloading, or unavailable. A supported Chrome version alone does not guarantee a model or pair. If a model cannot initialize, update Chrome, check device eligibility, allow Chrome to complete any required acquisition, and inspect `chrome://on-device-internals` where available.

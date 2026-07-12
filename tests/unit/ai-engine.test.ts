@@ -71,6 +71,53 @@ describe("translation engine", () => {
     expect(adapter.detect).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps Nano-authorized and ordinary automatic requests separate in flight", async () => {
+    // Given
+    const adapter: AiAdapter = {
+      ...makeAdapter({ confidence: 0 }),
+      detectWithNano: vi
+        .fn<NonNullable<AiAdapter["detectWithNano"]>>()
+        .mockResolvedValue({ kind: "detected", language: "es", confidence: 0.9 }),
+    };
+    const engine = createTranslationEngine(adapter);
+
+    // When
+    const [ordinary, nanoAuthorized] = await Promise.all([
+      engine.translate({ text: "romanized", source: { kind: "auto" }, target: "ko" }),
+      engine.translate({
+        text: "romanized",
+        source: { kind: "auto", nanoAllowed: true },
+        target: "ko",
+      }),
+    ]);
+
+    // Then
+    expect(ordinary).toEqual({ kind: "unknown-source" });
+    expect(nanoAuthorized).toMatchObject({ kind: "translated", provenance: "gemini-nano" });
+  });
+
+  it("fails closed when Nano detection cannot verify an available translation pair", async () => {
+    // Given
+    const adapter: AiAdapter = {
+      ...makeAdapter({ confidence: 0 }),
+      detectWithNano: vi
+        .fn<NonNullable<AiAdapter["detectWithNano"]>>()
+        .mockResolvedValue({ kind: "detected", language: "es", confidence: 0.9 }),
+      availability: vi.fn().mockRejectedValue(new Error("pair status unavailable")),
+    };
+    const engine = createTranslationEngine(adapter);
+
+    // When
+    const result = engine.translate({
+      text: "romanized",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "unknown-source" });
+  });
+
   it("uses a valid per-element hint before detection", async () => {
     // Given
     const adapter = makeAdapter({ detectedLanguage: "de" });

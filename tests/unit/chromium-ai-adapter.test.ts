@@ -24,6 +24,22 @@ afterEach(() => {
 });
 
 describe("Chromium AI adapter", () => {
+  it("truncates Nano detection input before it reaches the background bridge", async () => {
+    // Given
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.9,
+    });
+    const adapter = createChromiumAiAdapter(undefined, { detectWithNano });
+
+    // When
+    await adapter.detectWithNano?.("t".repeat(1_001), "c".repeat(161));
+
+    // Then
+    expect(detectWithNano).toHaveBeenCalledWith("t".repeat(1_000), "c".repeat(160));
+  });
+
   it("maps Chrome i18n language evidence", async () => {
     const detectLanguage: (text: string) => Promise<{
       readonly isReliable: boolean;

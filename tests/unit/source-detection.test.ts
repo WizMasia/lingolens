@@ -5,6 +5,7 @@ import { createSourceDetector } from "../../src/content/source-detection";
 type AdapterOptions = Readonly<{
   detect?: AiAdapter["detect"];
   detectWithChrome?: AiAdapter["detectWithChrome"];
+  detectWithNano?: NonNullable<AiAdapter["detectWithNano"]>;
   detections?: readonly (readonly AiDetection[])[];
   chromeDetection?: AiSecondaryDetection;
 }>;
@@ -17,6 +18,7 @@ const makeAdapter = (options: AdapterOptions = {}): AiAdapter => ({
       .mockResolvedValueOnce(options.detections?.[0] ?? [])
       .mockResolvedValueOnce(options.detections?.[1] ?? []),
   detectWithChrome: options.detectWithChrome ?? vi.fn().mockResolvedValue(options.chromeDetection),
+  ...(options.detectWithNano === undefined ? {} : { detectWithNano: options.detectWithNano }),
   availability: vi.fn().mockResolvedValue("available"),
   createTranslator: vi.fn(),
   destroy: vi.fn(),
@@ -203,5 +205,139 @@ describe("source detection", () => {
       language: "en",
       provenance: "user",
     });
+  });
+
+  it("uses Nano only for an opted-in live-chat request after deterministic detection is unavailable", async () => {
+    // Given
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.8,
+    });
+    const detector = createSourceDetector(makeAdapter({ detectWithNano }));
+
+    // When
+    const result = detector({
+      text: "1234",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
+
+    // Then
+    await expect(result).resolves.toEqual({
+      kind: "detected",
+      language: "es",
+      provenance: "gemini-nano",
+    });
+    expect(detectWithNano).toHaveBeenCalledWith("1234", "1234");
+  });
+
+  it("does not send ordinary page text to Nano", async () => {
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.9,
+    });
+    const detector = createSourceDetector(makeAdapter({ detectWithNano }));
+
+    await expect(
+      detector({ text: "1234", source: { kind: "auto" }, target: "ko" }),
+    ).resolves.toEqual({
+      kind: "needs-confirmation",
+    });
+    expect(detectWithNano).not.toHaveBeenCalled();
+  });
+
+  it("rejects Nano when its Translator pair is unavailable", async () => {
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.9,
+    });
+    const adapter: AiAdapter = {
+      ...makeAdapter({ detectWithNano }),
+      availability: vi.fn().mockResolvedValue("unavailable"),
+    };
+    const detector = createSourceDetector(adapter);
+
+    await expect(
+      detector({ text: "1234", source: { kind: "auto", nanoAllowed: true }, target: "ko" }),
+    ).resolves.toEqual({ kind: "needs-confirmation" });
+    expect(adapter.availability).toHaveBeenCalledWith("es", "ko");
+  });
+
+  it("normalizes a regional Nano language at the adapter boundary", async () => {
+    // Given
+    const detector = createSourceDetector(
+      makeAdapter({
+        detectWithNano: vi.fn().mockResolvedValue({
+          kind: "detected",
+          language: "es-ES",
+          confidence: 0.9,
+        }),
+      }),
+    );
+
+    // When
+    const result = detector({
+      text: "1234",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
+
+    // Then
+    await expect(result).resolves.toEqual({
+      kind: "detected",
+      language: "es",
+      provenance: "gemini-nano",
+    });
+  });
+
+  it("rejects an unsupported Nano language at the adapter boundary", async () => {
+    // Given
+    const detector = createSourceDetector(
+      makeAdapter({
+        detectWithNano: vi.fn().mockResolvedValue({
+          kind: "detected",
+          language: "sv",
+          confidence: 0.9,
+        }),
+      }),
+    );
+
+    // When
+    const result = detector({
+      text: "1234",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "needs-confirmation" });
+  });
+
+  it("preserves script detection before Nano", async () => {
+    // Given
+    const detectWithNano = vi.fn().mockResolvedValue({
+      kind: "detected",
+      language: "es",
+      confidence: 0.8,
+    });
+    const detector = createSourceDetector(makeAdapter({ detectWithNano }));
+
+    // When
+    const result = detector({
+      text: "안녕하세요",
+      source: { kind: "auto", nanoAllowed: true },
+      target: "ko",
+    });
+
+    // Then
+    await expect(result).resolves.toEqual({
+      kind: "detected",
+      language: "ko",
+      provenance: "script",
+    });
+    expect(detectWithNano).not.toHaveBeenCalled();
   });
 });

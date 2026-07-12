@@ -11,7 +11,7 @@ Improve LingoLens's experimental YouTube Live Chat translation when the normal o
 - Gemini Nano is an opt-in experimental aid, disabled by default. Enabling it must show its separate model requirement and never download a model without an explicit user gesture.
 - No page text, author identity, result, or telemetry leaves Chrome. Session-only state is removed on page navigation, restoration, and tab close.
 - Continue to render translated live-chat text only while hovered; do not add inline cards or page-layout elements.
-- Do not claim that Gemini Nano reliably identifies every language. Chrome currently documents expected Prompt API text inputs only for English, Japanese, Spanish, German, and French. Romanized Hindi, Urdu, and other unsupported languages need manual recovery.
+- Do not claim that Gemini Nano reliably identifies every language. Chrome currently documents expected Prompt API text inputs only for English, Japanese, Spanish, German, and French. Romanized Hindi and other supported Translator languages outside that set need manual recovery; Romanized Urdu cannot be recovered while Chrome Translator lacks a supported Urdu pair.
 - Do not invoke the Prompt API from a page frame. All Nano requests run in an extension-owned document, so a host page's iframe Permissions Policy cannot grant or deny model access.
 
 ## User experience
@@ -46,7 +46,7 @@ When a user chooses a source language for a normal live-chat message:
 - never apply it to other authors, other tabs, or a later navigation;
 - allow the same menu to replace or clear the author choice.
 
-This is the reliable recovery for mixed chats and for romanized languages outside Gemini Nano's documented support.
+This is the reliable recovery for mixed chats and for romanized languages outside Gemini Nano's documented support when Chrome Translator supports the selected source language.
 
 ## Architecture
 
@@ -85,7 +85,7 @@ The runtime independently parses the JSON, normalizes `language` against LingoLe
 - Unit tests cover Nano availability, structured-result parsing, confidence threshold, invalid language rejection, and no-op error paths.
 - DOM tests cover a user-selected author language overriding automatic/Nano detection, author isolation, clear/reselect behavior, and zero inline cards.
 - Queue tests verify that a newly added live message is serviced ahead of the historical backlog without parallel Translator calls.
-- Manual Chrome acceptance checks: English, Japanese, Arabic, a Spanish message, an ambiguous short Latin message, a romanized Hindi/Urdu message with per-author manual selection, hover restoration, popup restoration, and disabled-network operation after model preparation.
+- Manual Chrome acceptance checks: English, Japanese, Arabic, a Spanish message, an ambiguous short Latin message, a romanized Hindi message with per-author manual selection, hover restoration, popup restoration, and disabled-network operation after model preparation. Document Romanized Urdu as unsupported while no Urdu Translator pair is available.
 
 ## Non-goals
 

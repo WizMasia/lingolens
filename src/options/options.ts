@@ -1,3 +1,4 @@
+import { createNanoPreparation, type NanoPreparation } from "../content/nano-language-detector";
 import { LANGUAGE_CHOICES } from "../shared/languages";
 import {
   isModifierTrigger,
@@ -6,6 +7,7 @@ import {
   sameTrigger,
   type TriggerBinding,
 } from "../shared/settings";
+import { installNanoPreparationAction } from "./nano-preparation-action";
 import {
   conflictWarning,
   defaultShortcuts,
@@ -22,6 +24,8 @@ export type OptionsDependencies = Readonly<{
   load(): Promise<Settings>;
   save(settings: Settings): Promise<void>;
   uiLanguage: string;
+  prepareNano?: NanoPreparation["prepare"];
+  authorizeNano?(): Promise<void>;
 }>;
 
 export type OptionsApp = Readonly<{ ready: Promise<void> }>;
@@ -39,6 +43,7 @@ export const createOptionsApp = (
   const form = required(document, "settings-form", HTMLFormElement);
   const source = required(document, "source-language", HTMLSelectElement);
   const target = required(document, "target-language", HTMLSelectElement);
+  const liveChatNano = required(document, "live-chat-nano", HTMLInputElement);
   const controls: Record<ShortcutKind, TriggerControls> = {
     translation: triggerControls(document, "trigger"),
     menu: triggerControls(document, "menu-trigger"),
@@ -119,7 +124,7 @@ export const createOptionsApp = (
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void dependencies
-      .save(readSettings(form, source, target, triggers, dependencies.uiLanguage))
+      .save(readSettings(form, source, target, liveChatNano, triggers, dependencies.uiLanguage))
       .then(
         () => {
           status.textContent = "설정을 저장했습니다.";
@@ -129,6 +134,11 @@ export const createOptionsApp = (
         },
       );
   });
+  installNanoPreparationAction({
+    document,
+    prepare: dependencies.prepareNano ?? createNanoPreparation().prepare,
+    authorize: dependencies.authorizeNano ?? (() => Promise.resolve()),
+  });
 
   const ready = dependencies.load().then((settings) => {
     triggers = { translation: settings.trigger, menu: settings.menuTrigger };
@@ -137,6 +147,7 @@ export const createOptionsApp = (
     }
     source.value = settings.source.kind === "auto" ? "auto" : settings.source.language;
     target.value = settings.target.kind === "browser" ? "browser" : settings.target.language;
+    liveChatNano.checked = settings.liveChatNanoEnabled;
     controls.translation.value.textContent = triggerLabel(triggers.translation);
     controls.menu.value.textContent = triggerLabel(triggers.menu);
   });
@@ -147,6 +158,7 @@ const readSettings = (
   form: HTMLFormElement,
   source: HTMLSelectElement,
   target: HTMLSelectElement,
+  liveChatNano: HTMLInputElement,
   triggers: ShortcutBindings,
   uiLanguage: string,
 ): Settings => {
@@ -161,6 +173,7 @@ const readSettings = (
         target.value === "browser"
           ? { kind: "browser" }
           : { kind: "fixed", language: target.value },
+      liveChatNanoEnabled: liveChatNano.checked,
       trigger: triggers.translation,
       menuTrigger: triggers.menu,
     },
@@ -244,6 +257,9 @@ if (typeof chrome !== "undefined") {
     },
     async save(settings) {
       await chrome.storage.sync.set({ [STORAGE_KEY]: settings });
+    },
+    async authorizeNano() {
+      await chrome.runtime.sendMessage({ type: "nano-session-authorized" });
     },
     uiLanguage,
   });

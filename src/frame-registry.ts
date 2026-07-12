@@ -13,6 +13,7 @@ export type FrameRegistry = Readonly<{
   sendToLiveChat(tabId: number, message: RuntimeMessage): void;
   broadcast(message: RuntimeMessage): void;
   hasTopLiveChat(tabId: number): boolean;
+  hasLiveChatEndpoint(tabId: number, frameId: number): boolean;
 }>;
 
 export const isYouTubeLiveChatUrl = (url: string): boolean => {
@@ -52,6 +53,11 @@ export const createFrameRegistry = (): FrameRegistry => {
     hasTopLiveChat(tabId) {
       return [...(endpoints.get(tabId) ?? [])].some(
         (endpoint) => endpoint.frameId === 0 && isYouTubeLiveChatUrl(endpoint.url),
+      );
+    },
+    hasLiveChatEndpoint(tabId, frameId) {
+      return [...(endpoints.get(tabId) ?? [])].some(
+        (endpoint) => endpoint.frameId === frameId && isYouTubeLiveChatUrl(endpoint.url),
       );
     },
   };

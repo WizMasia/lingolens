@@ -7,11 +7,17 @@ export type TabState = Readonly<{
   message?: string;
 }>;
 
+export const MAX_NANO_TEXT_LENGTH = 1_000;
+export const MAX_NANO_CONTEXT_LENGTH = 160;
+
 export type RuntimeMessage =
   | { readonly type: "translate-page" }
   | { readonly type: "restore-page" }
   | { readonly type: "start-live-chat" }
   | { readonly type: "stop-live-chat" }
+  | { readonly type: "nano-session-authorized" }
+  | { readonly type: "detect-nano-source"; readonly text: string; readonly context: string }
+  | { readonly type: "offscreen-nano-detect"; readonly text: string; readonly context: string }
   | { readonly type: "get-tab-state" }
   | { readonly type: "settings-changed" }
   | { readonly type: "tab-state"; readonly state: TabState };
@@ -34,6 +40,18 @@ function isTabPhase(value: unknown): value is TabPhase {
 
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function parseNanoDetectionRequest(
+  type: "detect-nano-source" | "offscreen-nano-detect",
+  value: object,
+): RuntimeMessage | undefined {
+  if (!("text" in value) || typeof value.text !== "string") return undefined;
+  if (!("context" in value) || typeof value.context !== "string") return undefined;
+  if (value.text.length > MAX_NANO_TEXT_LENGTH || value.context.length > MAX_NANO_CONTEXT_LENGTH) {
+    return undefined;
+  }
+  return { type, text: value.text, context: value.context };
 }
 
 function parseTabState(value: unknown): TabState | undefined {
@@ -82,6 +100,12 @@ export function parseMessage(value: unknown): RuntimeMessage | undefined {
       return { type: "start-live-chat" };
     case "stop-live-chat":
       return { type: "stop-live-chat" };
+    case "nano-session-authorized":
+      return { type: "nano-session-authorized" };
+    case "detect-nano-source":
+      return parseNanoDetectionRequest("detect-nano-source", value);
+    case "offscreen-nano-detect":
+      return parseNanoDetectionRequest("offscreen-nano-detect", value);
     case "get-tab-state":
       return { type: "get-tab-state" };
     case "settings-changed":

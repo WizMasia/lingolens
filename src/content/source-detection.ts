@@ -1,4 +1,4 @@
-import { normalizeLanguage } from "../shared/languages";
+import { LANGUAGE_CHOICES, normalizeLanguage } from "../shared/languages";
 import type { AiAdapter, TranslationRequest } from "./ai-engine";
 import { inferScriptLanguage } from "./script-language";
 
@@ -8,6 +8,7 @@ export type DetectionProvenance =
   | "context-detector"
   | "chrome-i18n"
   | "script"
+  | "gemini-nano"
   | "user";
 
 export type SourceDetection =
@@ -20,12 +21,14 @@ export type AutomaticDetectionEvidence = Readonly<{
   provenance: Exclude<DetectionProvenance, "user">;
 }>;
 
-export type SourceDetectionRequest = Pick<TranslationRequest, "text" | "source">;
+export type SourceDetectionRequest = Pick<TranslationRequest, "text" | "source"> &
+  Readonly<{ target?: string }>;
 
 export type SourceDetector = (request: SourceDetectionRequest) => Promise<SourceDetection>;
 
 const PRIMARY_CONFIDENCE = 0.6;
 const SECONDARY_PERCENTAGE = 80;
+const NANO_SUPPORTED_LANGUAGES = new Set(LANGUAGE_CHOICES.map(({ value }) => value));
 
 type PrimaryEvidence = Readonly<{
   accepted?: string;
@@ -109,5 +112,34 @@ export const createSourceDetector =
     }
 
     const script = inferScriptLanguage(request.text);
-    return script === undefined ? { kind: "needs-confirmation" } : detected(script, "script");
+    if (script !== undefined) return detected(script, "script");
+
+    const detectWithNano = adapter.detectWithNano;
+    if (detectWithNano === undefined || request.source.nanoAllowed !== true)
+      return { kind: "needs-confirmation" };
+    const nano = await attempt(() => detectWithNano(request.text, detectionText));
+    if (nano?.kind === "detected") {
+      const language = normalizeLanguage(nano.language);
+      if (
+        language !== undefined &&
+        NANO_SUPPORTED_LANGUAGES.has(language) &&
+        nano.confidence >= 0.8 &&
+        (await hasAvailableNanoPair(adapter, language, request.target))
+      ) {
+        return detected(language, "gemini-nano");
+      }
+    }
+
+    return { kind: "needs-confirmation" };
   };
+
+const hasAvailableNanoPair = async (
+  adapter: AiAdapter,
+  source: string,
+  target: string | undefined,
+): Promise<boolean> => {
+  const normalizedTarget = normalizeLanguage(target ?? "");
+  if (normalizedTarget === undefined) return false;
+  const status = await attempt(() => adapter.availability(source, normalizedTarget));
+  return status !== undefined && status !== "unavailable";
+};

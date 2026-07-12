@@ -14,6 +14,12 @@ describe("runtime message protocol", () => {
     expect(parseMessage({ type: "stop-live-chat" })).toEqual({ type: "stop-live-chat" });
   });
 
+  it("parses an explicit Nano session authorization", () => {
+    expect(parseMessage({ type: "nano-session-authorized" })).toEqual({
+      type: "nano-session-authorized",
+    });
+  });
+
   it("parses a Nano source detection request", () => {
     expect(
       parseMessage({ type: "detect-nano-source", text: "hola", context: "buenos días" }),

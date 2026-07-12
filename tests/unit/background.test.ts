@@ -71,7 +71,7 @@ describe("background coordinator", () => {
   it("broadcasts settings changes", () => {
     const broadcast = vi.fn();
     const coordinator = createBackgroundCoordinator({
-      activeTab: async () => undefined,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
@@ -86,11 +86,13 @@ describe("background coordinator", () => {
     // Given
     const nanoBridge = createNanoBridge();
     const coordinator = createBackgroundCoordinator({
-      activeTab: async () => undefined,
+      activeTab: async () => ({ id: 7, url: undefined }),
       sendToTop: vi.fn(),
       sendToLiveChat: vi.fn(),
       liveChatState: createLiveChatState(),
       nanoBridge,
+      isLiveChatSender: () => true,
+      isNanoAuthorizationSender: () => true,
       broadcastSettings: vi.fn(),
       requestTabState: vi.fn(),
     });
@@ -104,16 +106,145 @@ describe("background coordinator", () => {
     await expect(beforePreparation).resolves.toEqual({ kind: "unavailable" });
     expect(nanoBridge.detect).not.toHaveBeenCalled();
 
-    await coordinator.receive({ type: "nano-session-authorized" });
-    const result = coordinator.receive({
-      type: "detect-nano-source",
-      text: "hola",
-      context: "context",
-    });
+    await coordinator.receive({ type: "translate-page" });
+    await coordinator.receive(
+      { type: "nano-session-authorized" },
+      undefined,
+      undefined,
+      "chrome-extension://fixture/options.html",
+    );
+    const result = coordinator.receive(
+      {
+        type: "detect-nano-source",
+        text: "hola",
+        context: "context",
+      },
+      7,
+      2,
+    );
 
     // Then
     await expect(result).resolves.toEqual({ kind: "detected", language: "es", confidence: 0.9 });
     expect(nanoBridge.detect).toHaveBeenCalledWith({ text: "hola", context: "context" });
+  });
+
+  it("rejects Nano detection from a non-live-chat sender after authorization", async () => {
+    // Given
+    const nanoBridge = createNanoBridge();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      isLiveChatSender: () => false,
+      isNanoAuthorizationSender: () => true,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+    await coordinator.receive(
+      { type: "nano-session-authorized" },
+      undefined,
+      undefined,
+      "chrome-extension://fixture/options.html",
+    );
+
+    // When
+    const result = coordinator.receive(
+      { type: "detect-nano-source", text: "hola", context: "context" },
+      7,
+      2,
+    );
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "unavailable" });
+    expect(nanoBridge.detect).not.toHaveBeenCalled();
+  });
+
+  it("accepts Nano session authorization only from the extension options page", async () => {
+    // Given
+    const nanoBridge = createNanoBridge();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      isLiveChatSender: () => true,
+      isNanoAuthorizationSender: () => true,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    await coordinator.receive({ type: "nano-session-authorized" }, 7, 0);
+    const result = coordinator.receive(
+      { type: "detect-nano-source", text: "hola", context: "context" },
+      7,
+      2,
+    );
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "unavailable" });
+    expect(nanoBridge.detect).not.toHaveBeenCalled();
+  });
+
+  it("stops the live chat and closes Nano when top-frame restoration rejects", async () => {
+    // Given
+    const nanoBridge = createNanoBridge();
+    const sendToLiveChat = vi.fn();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockRejectedValue(new Error("top frame unavailable")),
+      sendToLiveChat,
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+
+    // When
+    const restored = coordinator.receive({ type: "restore-page" });
+
+    // Then
+    await expect(restored).rejects.toThrow("top frame unavailable");
+    expect(sendToLiveChat).toHaveBeenCalledWith(7, { type: "stop-live-chat" });
+    expect(nanoBridge.close).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates live Nano capability immediately when its tab starts navigating", async () => {
+    // Given
+    const nanoBridge = createNanoBridge();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: undefined }),
+      sendToTop: vi.fn().mockResolvedValue(undefined),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      nanoBridge,
+      isLiveChatSender: () => true,
+      isNanoAuthorizationSender: () => true,
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+    });
+    await coordinator.receive({ type: "translate-page" });
+    await coordinator.receive(
+      { type: "nano-session-authorized" },
+      undefined,
+      undefined,
+      "chrome-extension://fixture/options.html",
+    );
+
+    // When
+    coordinator.navigationStarted(7);
+    const result = coordinator.receive(
+      { type: "detect-nano-source", text: "hola", context: "context" },
+      7,
+      2,
+    );
+
+    // Then
+    await expect(result).resolves.toEqual({ kind: "unavailable" });
+    expect(nanoBridge.detect).not.toHaveBeenCalled();
   });
 
   it("closes the Nano offscreen bridge when a tab is removed", async () => {

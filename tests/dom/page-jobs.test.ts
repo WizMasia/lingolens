@@ -8,6 +8,8 @@ import type {
 } from "../../src/content/ai-engine";
 import { TranslationError } from "../../src/content/ai-engine";
 import { createTranslationController } from "../../src/content/controller";
+import { createLiveChatSessionController } from "../../src/content/live-chat-session-controller";
+import { createRecordStore } from "../../src/content/records";
 import type { Settings } from "../../src/shared/settings";
 
 const testWindow = new Window();
@@ -313,6 +315,71 @@ describe("full-page controller", () => {
       kind: "auto",
       knownDetection: { kind: "detected", language: "en", provenance: "language-detector" },
     });
+  });
+
+  it("propagates Nano authorization from live-chat recovery through the queued translation", async () => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    appendLiveChatMessage(items, "romanized message");
+    const requests: TranslationRequest[] = [];
+    const engine: TranslationEngine = {
+      async detectSource() {
+        return { kind: "detected", language: "es", provenance: "gemini-nano" };
+      },
+      async translate(request) {
+        requests.push(request);
+        return translated(request.text);
+      },
+      async availability() {
+        return "available";
+      },
+      destroy() {},
+    };
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.startLiveChat();
+    await flushMutations();
+
+    // Then
+    expect(requests[0]?.source).toMatchObject({ kind: "auto", nanoAllowed: true });
+  });
+
+  it.each(["stop", "destroy"])("clears cached live-chat detection on %s", async (method) => {
+    // Given
+    testWindow.location.href = "https://www.youtube.com/live_chat?v=fixture";
+    const items = createLiveChat();
+    appendLiveChatMessage(items, "same message");
+    const store = createRecordStore();
+    const preferences: TranslationRequest["source"][] = [];
+    const session = createLiveChatSessionController({
+      document,
+      store,
+      settings: () => SETTINGS,
+      async translate(source, preference) {
+        preferences.push(preference);
+        store.getOrCreate(source).setDetection({
+          kind: "detected",
+          language: "en",
+          provenance: "language-detector",
+        });
+      },
+      syncRecords() {},
+    });
+    await session.start();
+    await flushMutations();
+    if (method === "stop") session.stop();
+    else session.destroy();
+    await session.start();
+
+    // When
+    appendLiveChatMessage(items, "same message");
+    await flushMutations();
+
+    // Then
+    expect(preferences[1]).toMatchObject({ kind: "auto" });
+    expect(preferences[1]).not.toMatchObject({ knownDetection: expect.anything() });
   });
 
   it("keeps immediate live-chat retranslation hover-only when page mode is inline", async () => {

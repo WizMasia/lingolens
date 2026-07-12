@@ -42,6 +42,18 @@ describe("frame registry", () => {
     expect(registry.hasTopLiveChat(7)).toBe(true);
   });
 
+  it("recognizes an exact registered live chat endpoint", () => {
+    // Given
+    const registry = createFrameRegistry();
+    registry.add(endpoint(7, 2, "https://www.youtube.com/live_chat?v=fixture"));
+    registry.add(endpoint(7, 3, "https://www.youtube.com/watch?v=fixture"));
+
+    // When / Then
+    expect(registry.hasLiveChatEndpoint(7, 2)).toBe(true);
+    expect(registry.hasLiveChatEndpoint(7, 3)).toBe(false);
+    expect(registry.hasLiveChatEndpoint(7, 4)).toBe(false);
+  });
+
   it("broadcasts settings only to registered frames", () => {
     const registry = createFrameRegistry();
     const registered = endpoint(7, 0, "https://www.youtube.com/watch?v=fixture");

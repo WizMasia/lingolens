@@ -22,6 +22,8 @@ export type BackgroundDependencies = Readonly<{
   liveChatState: LiveChatStateStore;
   nanoBridge?: NanoOffscreenBridge;
   hasTopLiveChat?(tabId: number): boolean;
+  isLiveChatSender?(tabId: number, frameId: number): boolean;
+  isNanoAuthorizationSender?(url: string | undefined): boolean;
   broadcastSettings(): void;
   requestTabState(tabId: number): Promise<TabState>;
 }>;
@@ -38,6 +40,7 @@ export type BackgroundCoordinator = Readonly<{
     value: unknown,
     senderTabId?: number,
     senderFrameId?: number,
+    senderUrl?: string,
   ): Promise<TabState | NanoLanguageDecision | undefined>;
   liveChatEndpointRegistered(tabId: number): Promise<void>;
   navigationStarted(tabId: number): void;
@@ -55,6 +58,8 @@ export const createBackgroundCoordinator = (
   let lifecycleEvent = 0;
   let nanoSessionAuthorized = false;
   const hasTopLiveChat = dependencies.hasTopLiveChat ?? (() => false);
+  const isLiveChatSender = dependencies.isLiveChatSender ?? (() => false);
+  const isNanoAuthorizationSender = dependencies.isNanoAuthorizationSender ?? (() => false);
   const isTopLiveChat = (tab: ActiveTab): boolean =>
     hasTopLiveChat(tab.id) || isYouTubeLiveChatUrl(tab.url ?? "");
   const queuePageAction = (action: () => Promise<void>): Promise<void> => {
@@ -103,7 +108,7 @@ export const createBackgroundCoordinator = (
     void dependencies.nanoBridge?.close();
   };
   return {
-    async receive(value, senderTabId, senderFrameId) {
+    async receive(value, senderTabId, senderFrameId, senderUrl) {
       const message = parseMessage(value);
       if (message === undefined) return undefined;
       switch (message.type) {
@@ -130,10 +135,20 @@ export const createBackgroundCoordinator = (
           dependencies.broadcastSettings();
           return undefined;
         case "nano-session-authorized":
-          nanoSessionAuthorized = true;
+          if (senderTabId === undefined && isNanoAuthorizationSender(senderUrl)) {
+            nanoSessionAuthorized = true;
+          }
           return undefined;
         case "detect-nano-source":
-          if (!nanoSessionAuthorized) return { kind: "unavailable" };
+          if (
+            !nanoSessionAuthorized ||
+            senderTabId === undefined ||
+            senderFrameId === undefined ||
+            liveChatIntent.intent(senderTabId) !== true ||
+            !isLiveChatSender(senderTabId, senderFrameId)
+          ) {
+            return { kind: "unavailable" };
+          }
           return (
             (await dependencies.nanoBridge?.detect({
               text: message.text,

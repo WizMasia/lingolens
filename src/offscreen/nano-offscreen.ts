@@ -15,6 +15,18 @@ const MAX_NANO_LANGUAGE_LENGTH = 35;
 
 const unavailable = (): NanoLanguageDecision => ({ kind: "unavailable" });
 
+export type NanoMessageSender = Readonly<{ url?: string }>;
+
+export type NanoOffscreenMessageHandler = (
+  value: unknown,
+  sender: NanoMessageSender,
+) => Promise<NanoLanguageDecision | undefined>;
+
+export type NanoOffscreenMessageHandlerDependencies = Readonly<{
+  detect(text: string, context: string): Promise<NanoLanguageDecision>;
+  isBackgroundSender(sender: NanoMessageSender): boolean;
+}>;
+
 let session: Promise<LanguageModel> | undefined;
 
 const detect = async (text: string, context: string): Promise<NanoLanguageDecision> => {
@@ -51,6 +63,16 @@ const promptFor = (text: string, context: string): string =>
     "Respond only with the constrained JSON object.",
   ].join("\n");
 
+export const createNanoOffscreenMessageHandler =
+  (dependencies: NanoOffscreenMessageHandlerDependencies): NanoOffscreenMessageHandler =>
+  async (value, sender) => {
+    const message = parseMessage(value);
+    if (message?.type !== "offscreen-nano-detect" || !dependencies.isBackgroundSender(sender)) {
+      return undefined;
+    }
+    return dependencies.detect(message.text, message.context);
+  };
+
 export const parseNanoOffscreenResponse = (response: string): NanoLanguageDecision => {
   try {
     const value: unknown = JSON.parse(response);
@@ -83,10 +105,9 @@ const isRecord = (value: unknown): value is NanoResponseRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 if (typeof chrome !== "undefined") {
-  chrome.runtime.onMessage.addListener((value: unknown) => {
-    const message = parseMessage(value);
-    return message?.type === "offscreen-nano-detect"
-      ? detect(message.text, message.context)
-      : undefined;
+  const handleMessage = createNanoOffscreenMessageHandler({
+    detect,
+    isBackgroundSender: (sender) => sender.url === chrome.runtime.getURL("background.js"),
   });
+  chrome.runtime.onMessage.addListener((value: unknown, sender) => handleMessage(value, sender));
 }

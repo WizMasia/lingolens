@@ -140,5 +140,6 @@ const hasAvailableNanoPair = async (
 ): Promise<boolean> => {
   const normalizedTarget = normalizeLanguage(target ?? "");
   if (normalizedTarget === undefined) return false;
-  return (await attempt(() => adapter.availability(source, normalizedTarget))) !== "unavailable";
+  const status = await attempt(() => adapter.availability(source, normalizedTarget));
+  return status !== undefined && status !== "unavailable";
 };

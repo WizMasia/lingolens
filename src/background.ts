@@ -51,6 +51,12 @@ if (typeof chrome !== "undefined") {
     hasTopLiveChat(tabId) {
       return frames.hasTopLiveChat(tabId);
     },
+    isLiveChatSender(tabId, frameId) {
+      return frames.hasLiveChatEndpoint(tabId, frameId);
+    },
+    isNanoAuthorizationSender(url) {
+      return url === chrome.runtime.getURL("options.html");
+    },
     broadcastSettings() {
       void chrome.tabs.query({}).then((tabs) => {
         for (const tab of tabs) {
@@ -73,7 +79,7 @@ if (typeof chrome !== "undefined") {
     },
   });
   chrome.runtime.onMessage.addListener((value: unknown, sender) =>
-    coordinator.receive(value, sender.tab?.id, sender.frameId),
+    coordinator.receive(value, sender.tab?.id, sender.frameId, sender.url),
   );
   chrome.runtime.onConnect.addListener((port) => {
     const sender = port.sender;

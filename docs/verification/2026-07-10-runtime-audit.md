@@ -114,16 +114,16 @@ The extension was rebuilt, loaded unpacked from `dist/`, and manually reloaded i
 
 ### Remaining manual evidence
 
-- Full-page activation and each popup/options control need a user-visible acceptance pass in the installed extension UI.
-- A public YouTube live-chat iframe was confirmed present on a current live page, but the popup-driven **페이지 전체 번역** action has not yet been activated in a real public chat. Its behavior is covered by the dynamic DOM, frame-routing, worker-restart, and race regression suites; it should remain an explicit private-beta acceptance item before public release.
+- On 2026-07-12, the unpacked extension was reloaded, its Nano option was explicitly prepared by the user, and the popup-driven **페이지 전체 번역** then **원문 복원** flow was exercised on Lofi Girl's public YouTube Live Chat. After restoration, the real chat retained its native layout with zero inline LingoLens hosts. Opening the child-frame language menu over an ordinary message rendered the fixed overlay and reported `스페인어 (Chrome AI)`; no LingoLens console error was recorded. One YouTube-owned scheduler error was present and is unrelated to the extension.
+- The selected public message was deterministically recognized before the Nano fallback, so an installed-Chrome structured Nano detection has not yet been directly observed. Keep the remaining Nano-specific checks below open and do not claim Nano availability from this run alone.
 
-## Nano feasibility gate: pending
+## Nano feasibility gate: partially exercised, still pending completion
 
-This installed-Chrome gate has not been run. Selecting **Prepare** can trigger a Chrome-managed Gemini Nano model download, so it requires user-facing confirmation at the time of preparation. Nano remains disabled unless the user explicitly enables it and saves the setting.
+The user explicitly enabled and prepared Nano on 2026-07-12, then exercised page translation and restoration on a real public YouTube Live Chat. Selecting **Prepare** can trigger a Chrome-managed Gemini Nano model download, so that action remains user-controlled. The selected chat text was recognized as Spanish by Chrome AI before the Nano fallback, so the remaining fallback-specific observations are still required before a public Nano-availability claim.
 
-1. Enable Experimental live-chat language assistance and click Prepare in Options.
-2. Confirm the options status reaches Ready without a network request carrying chat text.
-3. Run page translation on YouTube Live Chat; verify a supported normal message uses hover-only translation.
+1. Completed: Enable Experimental live-chat language assistance and click Prepare in Options.
+2. Pending direct inspection: Confirm the options status reaches Ready without a network request carrying chat text.
+3. Completed: Run page translation on YouTube Live Chat, then restore it; verify the chat has no inline LingoLens host after restoration.
 4. Use the configured menu shortcut over a romanized message, select Hindi, and verify later messages from that author use Hindi while another author's messages remain automatic. Do not claim this recovery for Romanized Urdu while Chrome Translator lacks a supported Urdu pair.
 5. Restore the page; confirm hover translation and author choices no longer apply.
 6. Disable network after preparation and repeat a supported local translation.

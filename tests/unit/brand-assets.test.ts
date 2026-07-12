@@ -60,7 +60,7 @@ describe("LingoLens static assets", () => {
       "bounded chat-message text and nearby context only to the Chrome-resident Nano model",
     );
     expect(privacy).toContain("not transmitted outside Chrome or retained after the tab session");
-    expect(audit).toContain("Nano feasibility gate: pending");
+    expect(audit).toContain("Nano feasibility gate: partially exercised, still pending completion");
     expect(audit).toContain(
       "Confirm the options status reaches Ready without a network request carrying chat text.",
     );

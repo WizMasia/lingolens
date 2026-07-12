@@ -2,6 +2,7 @@ import { Window } from "happy-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import { createHoverView } from "../../src/content/hover-view";
+import { createInlineLiteralPlan } from "../../src/content/inline-literals";
 import { createInlineView } from "../../src/content/inline-view";
 import { createRecordStore } from "../../src/content/records";
 
@@ -162,6 +163,82 @@ describe("inline view", () => {
 });
 
 describe("hover view", () => {
+  it("keeps code in place while translating surrounding text nodes", () => {
+    // Given
+    const source = sourceFixture("Run <code>npm install</code> before continuing.");
+    const plan = createInlineLiteralPlan(source);
+    if (plan === undefined) throw new Error("inline literal plan missing");
+    const record = createRecordStore().getOrCreate(source);
+    record.complete(
+      "계속하기 전에 npm install을 실행하세요.",
+      "en",
+      "ko",
+      undefined,
+      "language-detector",
+      ["계속하기 전에 ", "을 실행하세요."],
+    );
+    const view = createHoverView();
+    view.render(record);
+
+    // When
+    source.dispatchEvent(event("pointerenter"));
+
+    // Then
+    expect(source.textContent).toBe("계속하기 전에 npm install을 실행하세요.");
+    expect(source.querySelector("code")?.textContent).toBe("npm install");
+  });
+
+  it("translates emphasized text while preserving its inline element", () => {
+    // Given
+    const source = sourceFixture("This <em>important phrase</em> should remain emphasized.");
+    const record = createRecordStore().getOrCreate(source);
+    record.complete(
+      "이 중요한 구절은 계속 강조되어야 합니다.",
+      "en",
+      "ko",
+      undefined,
+      "language-detector",
+      ["이 ", "중요한 구절", "은 계속 강조되어야 합니다."],
+    );
+    const view = createHoverView();
+    view.render(record);
+
+    // When
+    source.dispatchEvent(event("pointerenter"));
+
+    // Then
+    expect(source.textContent).toBe("이 중요한 구절은 계속 강조되어야 합니다.");
+    expect(source.querySelector("em")?.textContent).toBe("중요한 구절");
+  });
+
+  it("does not reveal a hidden inline literal in the composed translation", () => {
+    // Given
+    const source = sourceFixture("Visible <code hidden>API_SECRET</code> text.");
+    const plan = createInlineLiteralPlan(source);
+    if (plan === undefined) throw new Error("inline literal plan missing");
+
+    // When
+    const text = plan.compose(["번역된 ", " 텍스트."]);
+
+    // Then
+    expect(text).toBe("번역된  텍스트.");
+    expect(text).not.toContain("API_SECRET");
+  });
+
+  it("does not reveal a hidden descendant of a visible inline literal", () => {
+    // Given
+    const source = sourceFixture("Visible <code>shown<span hidden>API_SECRET</span></code> text.");
+    const plan = createInlineLiteralPlan(source);
+    if (plan === undefined) throw new Error("inline literal plan missing");
+
+    // When
+    const text = plan.compose(["번역 ", " 텍스트."]);
+
+    // Then
+    expect(text).toBe("번역 shown 텍스트.");
+    expect(text).not.toContain("API_SECRET");
+  });
+
   it("restores exact text nodes after hover replacement", () => {
     // Given
     const source = sourceFixture();

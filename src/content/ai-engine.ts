@@ -53,6 +53,8 @@ type AutomaticSource = Extract<SourcePreference, { readonly kind: "auto" }> &
 
 export type TranslationRequest = Readonly<{
   text: string;
+  detectionText?: string;
+  inlineTextSegments?: readonly string[];
   source: AutomaticSource | Extract<SourcePreference, { readonly kind: "fixed" }>;
   target: string;
 }>;
@@ -64,6 +66,7 @@ export type TranslationResult =
       sourceLanguage: string;
       targetLanguage: string;
       provenance: DetectionProvenance;
+      inlineTextSegments?: readonly string[];
     }>
   | Readonly<{
       kind: "skipped";
@@ -134,25 +137,36 @@ export const createTranslationEngine = (adapter: AiAdapter): TranslationEngine =
     assertActive(active);
     const target = normalizeLanguage(request.target);
     if (target === undefined) throw pairUnavailable(request.target);
-    const sourceDetection = await detectSource(request);
+    const sourceDetection = await detectSource({
+      text: request.detectionText ?? request.text,
+      source: request.source,
+      target: request.target,
+    });
     assertActive(active);
     if (sourceDetection.kind === "needs-confirmation") return { kind: "unknown-source" };
     const { language: source, provenance } = sourceDetection;
     if (source === target) return { kind: "skipped", sourceLanguage: source, provenance };
 
-    const cacheKey = `${source}\0${target}\0${provenance}\0${request.text}`;
+    const cacheKey = JSON.stringify([
+      source,
+      target,
+      provenance,
+      request.text,
+      request.inlineTextSegments ?? null,
+    ]);
     const cached = results.get(cacheKey);
     if (cached !== undefined) return cached;
     const pending = resultsInFlight.get(cacheKey);
     if (pending !== undefined) return pending;
 
-    const work = translators.translate(request.text, source, target).then(
-      (text): TranslationResult => ({
+    const work = translateText(translators, request, source, target).then(
+      ({ text, inlineTextSegments }): TranslationResult => ({
         kind: "translated",
         text,
         sourceLanguage: source,
         targetLanguage: target,
         provenance,
+        ...(inlineTextSegments === undefined ? {} : { inlineTextSegments }),
       }),
     );
     resultsInFlight.set(cacheKey, work);
@@ -207,7 +221,39 @@ const requestKey = (request: TranslationRequest): string => {
           request.source.knownDetection ?? null,
           request.source.nanoAllowed === true,
         ];
-  return JSON.stringify([source, request.target, request.text]);
+  return JSON.stringify([
+    source,
+    request.target,
+    request.text,
+    request.detectionText ?? "",
+    request.inlineTextSegments ?? null,
+  ]);
+};
+
+const translateText = (
+  translators: ReturnType<typeof createTranslatorCache>,
+  request: TranslationRequest,
+  source: string,
+  target: string,
+): Promise<Readonly<{ text: string; inlineTextSegments?: readonly string[] }>> => {
+  if (request.inlineTextSegments === undefined) {
+    return translators.translate(request.text, source, target).then((text) => ({ text }));
+  }
+  return Promise.all(
+    request.inlineTextSegments.map((segment) =>
+      segment.trim().length === 0
+        ? Promise.resolve(segment)
+        : translators
+            .translate(segment, source, target)
+            .then((translated) => preserveBoundary(translated, segment)),
+    ),
+  ).then((translated) => ({ text: translated.join(""), inlineTextSegments: translated }));
+};
+
+const preserveBoundary = (translated: string, source: string): string => {
+  const leading = source.match(/^\s*/u)?.[0] ?? "";
+  const trailing = source.match(/\s*$/u)?.[0] ?? "";
+  return `${leading}${translated.trim()}${trailing}`;
 };
 
 const createPairTranslator = async (

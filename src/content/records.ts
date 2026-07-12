@@ -26,6 +26,7 @@ export type TranslationSuccess = Readonly<{
   sourceLanguage: string;
   targetLanguage: string;
   provenance: DetectionProvenance;
+  inlineTextSegments?: readonly string[];
 }>;
 
 export type ElementDetectionState =
@@ -153,10 +154,17 @@ export class ElementRecord {
     targetLanguage: string,
     sourceFingerprint = this.#sourceFingerprint,
     provenance: DetectionProvenance = "language-detector",
+    inlineTextSegments?: readonly string[],
   ): void {
     this.#assertTransition("translated");
     this.#phase = "translated";
-    this.#lastSuccess = { text, sourceLanguage, targetLanguage, provenance };
+    this.#lastSuccess = {
+      text,
+      sourceLanguage,
+      targetLanguage,
+      provenance,
+      ...(inlineTextSegments === undefined ? {} : { inlineTextSegments }),
+    };
     if (this.#activeViewCount === 0 && (this.source.textContent ?? "") === sourceFingerprint) {
       this.#currentSnapshot = snapshotText(this.source);
     }

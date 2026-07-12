@@ -1,5 +1,10 @@
 const HARD_UNSAFE_SELECTOR =
-  'script,style,noscript,template,code,pre,textarea,input,select,option,button,svg title,svg desc,svg metadata,[aria-hidden="true"],[hidden],[data-local-translator-ui]';
+  'script,style,noscript,template,code,kbd,samp,var,pre,textarea,input,select,option,button,svg title,svg desc,svg metadata,[aria-hidden="true"],[hidden],[data-local-translator-ui]';
+const LITERAL_UNSAFE_SELECTOR =
+  'script,style,noscript,template,pre,textarea,input,select,option,button,svg title,svg desc,svg metadata,[aria-hidden="true"],[hidden],[data-local-translator-ui]';
+const INLINE_SELECTOR = "a, b, em, i, mark, small, span, strong, sub, sup";
+const READING_BLOCK_SELECTOR =
+  "blockquote, caption, dd, dt, figcaption, h1, h2, h3, h4, h5, h6, li, p, summary, td, th";
 
 type RootContext = Readonly<{
   hardUnsafe: boolean;
@@ -88,6 +93,22 @@ function hasUnsafeContext(element: Element): boolean {
   return hasHardUnsafeContext(element) || isEditableContext(element);
 }
 
+export const isSafeInlineLiteral = (element: Element): element is HTMLElement =>
+  element instanceof HTMLElement &&
+  element.isConnected &&
+  !isEditableContext(element) &&
+  !hasHiddenStyleContext(element) &&
+  !hasLiteralUnsafeContext(element);
+
+const hasLiteralUnsafeContext = (element: Element): boolean => {
+  let current: Element | null = element;
+  while (current !== null) {
+    if (current.matches(LITERAL_UNSAFE_SELECTOR)) return true;
+    current = composedParent(current);
+  }
+  return false;
+};
+
 function hasVisibleRect(element: Element): boolean {
   return Array.from(element.getClientRects()).some((rect) => rect.width > 0 && rect.height > 0);
 }
@@ -170,7 +191,12 @@ function scanRoot(root: Document | ShadowRoot, context: RootContext): HTMLElemen
       const visibility = computedStyle(node)?.visibility;
       const styleHidden = concealed || visibility === "hidden" || visibility === "collapse";
       const candidate =
-        node instanceof HTMLElement && node.isConnected && !hardUnsafe && !editable && !styleHidden
+        node instanceof HTMLElement &&
+        node.isConnected &&
+        !hardUnsafe &&
+        !editable &&
+        !styleHidden &&
+        !isCompositeTextContainer(node)
           ? node
           : undefined;
       const state: ScanState = {
@@ -253,13 +279,26 @@ export function nearestTarget(element: Element | null): HTMLElement | undefined 
   }
   let current = element;
   while (current !== null) {
-    if (isEligibleElement(current)) {
+    if (
+      !isInlineDescendantOfReadingBlock(current) &&
+      !isCompositeTextContainer(current) &&
+      isEligibleElement(current)
+    ) {
       return current;
     }
     current = composedParent(current);
   }
   return undefined;
 }
+
+const isCompositeTextContainer = (element: Element): boolean =>
+  !element.matches(READING_BLOCK_SELECTOR)
+    ? element.querySelector(READING_BLOCK_SELECTOR) !== null
+    : element.querySelectorAll(READING_BLOCK_SELECTOR).length > 1;
+
+const isInlineDescendantOfReadingBlock = (element: Element): boolean =>
+  element.matches(INLINE_SELECTOR) &&
+  element.parentElement?.closest(READING_BLOCK_SELECTOR) !== null;
 
 export function targetFromSelection(selection: Selection | null): HTMLElement | undefined {
   if (selection === null || selection.isCollapsed || selection.anchorNode === null) {

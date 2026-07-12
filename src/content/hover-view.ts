@@ -1,3 +1,4 @@
+import { createInlineLiteralPlan } from "./inline-literals";
 import type { ElementRecord, RecordLifecycle, TextSnapshot, TranslationView } from "./records";
 
 type HoverEntry = {
@@ -134,9 +135,22 @@ const activate = (entry: HoverEntry): void => {
   if (entry.translated) return;
   entry.originalLang = entry.record.source.getAttribute("lang");
   entry.originalDir = entry.record.source.getAttribute("dir");
+  const literalValues =
+    success.inlineTextSegments === undefined
+      ? undefined
+      : createInlineLiteralPlan(entry.record.source)?.viewValues(success.inlineTextSegments);
+  if (success.inlineTextSegments !== undefined && literalValues === undefined) return;
   entry.record.beginViewOwnership();
   for (const snapshot of entry.record.currentSnapshot) {
-    setViewText(entry.record, snapshot, snapshot === target ? success.text : "");
+    const value =
+      literalValues === undefined
+        ? snapshot === target
+          ? success.text
+          : ""
+        : literalValues.has(snapshot.node)
+          ? (literalValues.get(snapshot.node) ?? "")
+          : snapshot.value;
+    setViewText(entry.record, snapshot, value);
   }
   entry.appliedLang = success.targetLanguage;
   entry.appliedDir = languageDirection(success.targetLanguage);

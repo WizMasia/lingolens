@@ -315,7 +315,7 @@ describe("target discovery", () => {
 
   it("finds the nearest eligible ancestor", () => {
     // Given
-    document.body.innerHTML = `<p id="target">Readable sentence here.<em id="child">...</em><code id="code">secret()</code></p>`;
+    document.body.innerHTML = `<p id="target">Readable sentence here.<em id="child">emphasized text</em><code id="code">secret()</code></p>`;
     const target = elementById("target");
     const child = elementById("child");
     const code = elementById("code");
@@ -325,5 +325,60 @@ describe("target discovery", () => {
 
     // Then
     expect(nearest).toEqual([target, undefined]);
+  });
+
+  it("does not select a multi-paragraph container from its outer surface", () => {
+    // Given
+    document.body.innerHTML = `
+      <section id="outer"><p id="first">First paragraph.</p><p id="second">Second paragraph.</p></section>
+    `;
+    const outer = elementById("outer");
+    const first = elementById("first");
+
+    // When
+    const nearest = [nearestTarget(outer), nearestTarget(first)];
+
+    // Then
+    expect(nearest).toEqual([undefined, first]);
+  });
+
+  it("does not select a reading block that contains multiple paragraphs", () => {
+    // Given
+    document.body.innerHTML = `
+      <blockquote id="outer"><p id="first">First paragraph.</p><p id="second">Second paragraph.</p></blockquote>
+    `;
+    const outer = elementById("outer");
+
+    // When
+    const nearest = nearestTarget(outer);
+
+    // Then
+    expect(nearest).toBeUndefined();
+  });
+
+  it("keeps keyboard literals out of source text and target selection", () => {
+    // Given
+    document.body.innerHTML = `<p id="target">Press <kbd id="key">Ctrl+C</kbd> now.</p>`;
+    const target = elementById("target");
+    const key = elementById("key");
+
+    // When
+    const result = [collectSourceText(target), nearestTarget(key)];
+
+    // Then
+    expect(result).toEqual(["Press now.", undefined]);
+  });
+
+  it("discovers individual paragraphs instead of a container with its own label", () => {
+    // Given
+    document.body.innerHTML = `
+      <section id="outer">Section label.<p id="first">First paragraph.</p><p id="second">Second paragraph.</p></section>
+    `;
+
+    // When
+    const targets = discoverTargets(document);
+
+    // Then
+    expect(targets.map((target) => target.id)).toEqual(["first", "second"]);
   });
 });

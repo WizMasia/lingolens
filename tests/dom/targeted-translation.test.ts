@@ -255,6 +255,25 @@ describe("targeted translation", () => {
     );
   });
 
+  it("translates inline text nodes without sending a marker to the model", async () => {
+    // Given
+    const source = document.createElement("p");
+    source.append("Run ", document.createElement("code"), " before continuing.");
+    const code = source.querySelector("code");
+    if (code === null) throw new Error("code fixture missing");
+    code.textContent = "npm install";
+    document.body.append(source);
+    const { engine, requests } = engineFixture();
+    const controller = createTranslationController({ document, engine, settings: SETTINGS });
+
+    // When
+    await controller.translateTarget(source);
+
+    // Then
+    expect(requests[0]?.text).toBe("Run before continuing.");
+    expect(requests[0]?.inlineTextSegments).toEqual(["Run ", " before continuing."]);
+  });
+
   it("omits a malformed ancestor language hint", async () => {
     // Given
     const parent = document.createElement("section");

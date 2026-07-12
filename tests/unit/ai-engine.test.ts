@@ -71,6 +71,31 @@ describe("translation engine", () => {
     expect(adapter.detect).toHaveBeenCalledTimes(1);
   });
 
+  it("translates inline text segments independently", async () => {
+    // Given
+    const translate = vi
+      .fn<AiTranslator["translate"]>()
+      .mockImplementation(async (text) => `ko:${text.trim()}`);
+    const engine = createTranslationEngine(makeAdapter({ translate }));
+
+    // When
+    const result = await engine.translate({
+      text: "Run before continuing.",
+      inlineTextSegments: ["Run ", " before continuing."],
+      source: { kind: "fixed", language: "en" },
+      target: "ko",
+    });
+
+    // Then
+    expect(result).toMatchObject({
+      kind: "translated",
+      text: "ko:Run  ko:before continuing.",
+      inlineTextSegments: ["ko:Run ", " ko:before continuing."],
+    });
+    expect(translate).toHaveBeenCalledWith("Run ");
+    expect(translate).toHaveBeenCalledWith(" before continuing.");
+  });
+
   it("keeps Nano-authorized and ordinary automatic requests separate in flight", async () => {
     // Given
     const adapter: AiAdapter = {

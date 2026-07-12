@@ -9,6 +9,7 @@ import {
   type TranslationRequest,
   type TranslationResult,
 } from "./ai-engine";
+import { createInlineLiteralPlan } from "./inline-literals";
 import type { ElementRecord, RecordStore, TranslationView } from "./records";
 import { collectSourceText } from "./targets";
 
@@ -95,6 +96,7 @@ const restoreCancelledAttempt = (
     priorSuccess.targetLanguage,
     fingerprint,
     priorSuccess.provenance,
+    priorSuccess.inlineTextSegments,
   );
 };
 
@@ -103,8 +105,17 @@ const translationRequest = (
   record: ElementRecord,
   text: string,
 ): TranslationRequest => {
+  const literalPlan = createInlineLiteralPlan(attempt.source);
+  const requestText = {
+    text,
+    ...(literalPlan === undefined
+      ? {}
+      : {
+          inlineTextSegments: literalPlan.fragments,
+        }),
+  };
   if (attempt.preference.kind === "fixed") {
-    return { text, source: attempt.preference, target: attempt.target };
+    return { ...requestText, source: attempt.preference, target: attempt.target };
   }
   const knownDetection = attempt.preference.knownDetection ?? automaticEvidence(record);
   return {
@@ -118,6 +129,7 @@ const translationRequest = (
             ...(attempt.preference.nanoAllowed === true ? { nanoAllowed: true } : {}),
           },
     ),
+    ...requestText,
     target: attempt.target,
   };
 };
@@ -157,17 +169,24 @@ const automaticEvidence = (record: ElementRecord): AutomaticDetectionEvidence | 
 const commitResult = (commit: ResultCommit): boolean => {
   const { record, result, fingerprint, runtime } = commit;
   switch (result.kind) {
-    case "translated":
+    case "translated": {
+      const text = translatedText(record.source, result);
+      if (text === undefined) {
+        runtime.store.markStale(record);
+        return false;
+      }
       record.setDetection(detectionState(result.sourceLanguage, result.provenance));
       record.complete(
-        result.text,
+        text,
         result.sourceLanguage,
         result.targetLanguage,
         fingerprint,
         result.provenance,
+        result.inlineTextSegments,
       );
       runtime.view().render(record);
       return true;
+    }
     case "skipped":
       record.setDetection(detectionState(result.sourceLanguage, result.provenance));
       runtime.store.restoreTranslation(record.source);
@@ -182,6 +201,14 @@ const commitResult = (commit: ResultCommit): boolean => {
       return assertNever(result);
   }
 };
+
+const translatedText = (
+  source: HTMLElement,
+  result: Extract<TranslationResult, { kind: "translated" }>,
+): string | undefined =>
+  result.inlineTextSegments === undefined
+    ? result.text
+    : createInlineLiteralPlan(source)?.compose(result.inlineTextSegments);
 
 const detectionState = (
   language: string,

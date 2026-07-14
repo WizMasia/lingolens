@@ -81,7 +81,12 @@ export const createDocumentTitleTranslation = (
           target: targetLanguage(settings),
         });
         if (!isCurrent(attempt, signal)) {
-          if (dependencies.document.title !== attempt.observedTitle) release();
+          if (
+            attempt.version === version &&
+            dependencies.document.title !== attempt.observedTitle
+          ) {
+            release();
+          }
           return signal.aborted || attempt.version !== version ? "skipped" : "failed";
         }
         return commit(attempt, result);

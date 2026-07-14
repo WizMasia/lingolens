@@ -87,6 +87,33 @@ describe("document title translation", () => {
     expect(requiredAttempt(title).source).toBe("Updated by site");
   });
 
+  it("preserves newer ownership when a superseded result arrives", async () => {
+    // Given: attempt A remains pending while attempt B translates a newer site title.
+    document.title = "First article";
+    let resolveFirst: ((result: TranslationResult) => void) | undefined;
+    const firstPending = new Promise<TranslationResult>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const title = createDocumentTitleTranslation({
+      document,
+      engine: fakeEngine((request) =>
+        request.text === "First article" ? firstPending : Promise.resolve(translated("두 번째 글")),
+      ),
+      settings: () => SETTINGS,
+    });
+    const firstResult = title.translate(requiredAttempt(title), new AbortController().signal);
+    document.title = "Second article";
+    await title.translate(requiredAttempt(title), new AbortController().signal);
+
+    // When: the superseded attempt resolves after B owns the translated title.
+    resolveFirst?.(translated("첫 번째 글"));
+    await firstResult;
+    title.restore();
+
+    // Then: restoring uses B's source rather than losing B's ownership.
+    expect(document.title).toBe("Second article");
+  });
+
   it("discards a late result after cancellation", async () => {
     document.title = "Original article";
     let resolveResult: ((result: TranslationResult) => void) | undefined;

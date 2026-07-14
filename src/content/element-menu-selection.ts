@@ -1,5 +1,6 @@
 import type { Settings } from "../shared/settings";
 import type { SourceDetection, TranslationEngine } from "./ai-engine";
+import { targetLanguage } from "./controller-settings";
 import type { ElementMenuSelection } from "./element-menu";
 import type { ElementRecord, RecordStore } from "./records";
 import { sourceDetectionRequest, sourceRecordText } from "./translation-attempt";
@@ -78,6 +79,3 @@ const menuSelection = (record: ElementRecord, settings: Settings): ElementMenuSe
 const selectedSource = (record: ElementRecord, settings: Settings): "auto" | string =>
   record.languageOverride?.source ??
   (settings.source.kind === "fixed" ? settings.source.language : "auto");
-
-const targetLanguage = (settings: Settings): string =>
-  settings.target.kind === "fixed" ? settings.target.language : settings.target.resolvedLanguage;

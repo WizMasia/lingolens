@@ -2,6 +2,7 @@ import type { TabState } from "../shared/protocol";
 import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
 import { TranslationError } from "./ai-engine";
+import { settingsLanguages, targetLanguage } from "./controller-settings";
 import { createElementMenu, type ElementLanguageChoice, type ElementMenu } from "./element-menu";
 import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
@@ -247,15 +248,6 @@ export const createTranslationController = (
       hovered = null;
     },
   };
-};
-
-const targetLanguage = (settings: Settings): string =>
-  settings.target.kind === "fixed" ? settings.target.language : settings.target.resolvedLanguage;
-
-const settingsLanguages = (settings: Settings): readonly ElementLanguageChoice[] => {
-  const values = new Set<string>([targetLanguage(settings)]);
-  if (settings.source.kind === "fixed") values.add(settings.source.language);
-  return [...values].map((value) => ({ value, label: value }));
 };
 
 const assertNever = (value: never): never => {

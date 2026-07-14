@@ -55,9 +55,9 @@ export const createDocumentTitleTranslation = (
   const commit = (attempt: DocumentTitleAttempt, result: TranslationResult): PageJobOutcome => {
     switch (result.kind) {
       case "translated":
-        sourceTitle = attempt.source;
-        translatedTitle = result.text;
         dependencies.document.title = result.text;
+        sourceTitle = attempt.source;
+        translatedTitle = dependencies.document.title;
         return "translated";
       case "skipped":
         dependencies.document.title = attempt.source;

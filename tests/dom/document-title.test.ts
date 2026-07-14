@@ -71,6 +71,24 @@ describe("document title translation", () => {
     expect(document.title).toBe("Original article");
   });
 
+  it("keeps ownership when title assignment canonicalizes whitespace", async () => {
+    // Given: translation text whose ASCII whitespace is canonicalized by the title setter.
+    document.title = "Original article";
+    const title = createDocumentTitleTranslation({
+      document,
+      engine: fakeEngine(vi.fn().mockResolvedValue(translated("  번역   된\n제목  "))),
+      settings: () => SETTINGS,
+    });
+
+    // When: translation commits and the next run prepares before restoration.
+    await title.translate(requiredAttempt(title), new AbortController().signal);
+
+    // Then: the canonical live title remains owned and reuses/restores the original source.
+    expect(requiredAttempt(title).source).toBe("Original article");
+    title.restore();
+    expect(document.title).toBe("Original article");
+  });
+
   it("preserves a site-owned change and captures it on the next run", async () => {
     document.title = "Original article";
     const title = createDocumentTitleTranslation({

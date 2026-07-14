@@ -30,7 +30,7 @@ bun run build
 
 ## Use LingoLens
 
-- **Full page:** open the toolbar popup, choose **페이지 전체 번역**, and use **원문 복원** to remove translations made by LingoLens.
+- **Full page:** open the toolbar popup and choose **페이지 전체 번역** to translate eligible page text and the browser-tab title. Use **원문 복원** to remove translations made by LingoLens.
 - **An element:** by default, press `Ctrl` while text is selected or while the pointer is over a text element. Use the same trigger again to restore that element.
 - **Retranslation and language menu:** press the language-menu trigger (`Ctrl + Shift` by default) over an eligible element. The floating menu lets you choose source and target languages, shows the detected source, and offers **Translate again** or restore.
 - **Inline or hover display:** open **설정** and choose **원문 아래 표시** to add a translation after the source text, or **호버 시 교체** to show the translation while the element is hovered or focused.

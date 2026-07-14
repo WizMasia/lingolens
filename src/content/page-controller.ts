@@ -1,4 +1,5 @@
 import type { TabState } from "../shared/protocol";
+import type { DocumentTitleAttempt, DocumentTitleTranslation } from "./document-title";
 import { type PageJobOutcome, type PageJobSummary, runPageJob } from "./jobs";
 import type { ElementRecord, RecordStore } from "./records";
 import { createActiveRecordObserver } from "./stale-records";
@@ -15,10 +16,15 @@ export type PageController = Readonly<{
 export type PageControllerDependencies = Readonly<{
   document: Document;
   store: RecordStore;
+  title: DocumentTitleTranslation;
   translate(source: HTMLElement, signal: AbortSignal): Promise<PageJobOutcome>;
   onStale(record: ElementRecord): void;
   onState(state: TabState): void;
 }>;
+
+type PageTarget =
+  | Readonly<{ kind: "element"; source: HTMLElement }>
+  | Readonly<{ kind: "title"; attempt: DocumentTitleAttempt }>;
 
 const IDLE_STATE: TabState = {
   phase: "idle",
@@ -26,6 +32,30 @@ const IDLE_STATE: TabState = {
   total: 0,
   skipped: 0,
   failed: 0,
+};
+
+const pageTargets = (dependencies: PageControllerDependencies): readonly PageTarget[] => {
+  const elements: readonly PageTarget[] = discoverTargets(dependencies.document).map((source) => ({
+    kind: "element",
+    source,
+  }));
+  const title = dependencies.title.prepare();
+  return title === undefined ? elements : [{ kind: "title", attempt: title }, ...elements];
+};
+
+const translateTarget = (
+  target: PageTarget,
+  dependencies: PageControllerDependencies,
+  signal: AbortSignal,
+): Promise<PageJobOutcome> => {
+  switch (target.kind) {
+    case "element":
+      return dependencies.translate(target.source, signal);
+    case "title":
+      return dependencies.title.translate(target.attempt, signal);
+    default:
+      return assertNever(target);
+  }
 };
 
 export const createPageController = (dependencies: PageControllerDependencies): PageController => {
@@ -45,6 +75,7 @@ export const createPageController = (dependencies: PageControllerDependencies): 
 
   const reset = (notify: boolean, preserveDetection: boolean): void => {
     activeJob?.abort();
+    dependencies.title.restore();
     activeJob = null;
     records.disconnect();
     if (preserveDetection) dependencies.store.restoreAllTranslations();
@@ -56,11 +87,11 @@ export const createPageController = (dependencies: PageControllerDependencies): 
 
   const run = async (job: AbortController): Promise<void> => {
     if (job.signal.aborted) return;
-    const targets = discoverTargets(dependencies.document);
+    const targets = pageTargets(dependencies);
     publish(translatingState(emptySummary(targets.length)));
     const result = await runPageJob(
       targets,
-      (source) => dependencies.translate(source, job.signal),
+      (target) => translateTarget(target, dependencies, job.signal),
       (progress) => {
         if (activeJob === job) publish(translatingState(progress));
         records.sync();
@@ -116,3 +147,7 @@ const finalState = (summary: PageJobSummary): TabState => ({
   skipped: summary.skipped,
   failed: summary.failed,
 });
+
+const assertNever = (value: never): never => {
+  throw new TypeError(`Unhandled variant: ${String(value)}`);
+};

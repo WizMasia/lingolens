@@ -3,6 +3,7 @@ import type { Settings } from "../shared/settings";
 import type { TranslationEngine } from "./ai-engine";
 import { TranslationError } from "./ai-engine";
 import { settingsLanguages, targetLanguage } from "./controller-settings";
+import { createDocumentTitleTranslation } from "./document-title";
 import { createElementMenu, type ElementLanguageChoice, type ElementMenu } from "./element-menu";
 import { inspectMenuSelection } from "./element-menu-selection";
 import { createHoverView } from "./hover-view";
@@ -127,9 +128,16 @@ export const createTranslationController = (
     translationView: TranslationView = view,
   ): Promise<boolean> => executeTranslation(attempt, { ...runtime, view: () => translationView });
 
+  const title = createDocumentTitleTranslation({
+    document: dependencies.document,
+    engine: dependencies.engine,
+    settings: () => settings,
+  });
+
   const page = createPageController({
     document: dependencies.document,
     store,
+    title,
     async translate(source, signal): Promise<PageJobOutcome> {
       const record = store.getOrCreate(source);
       const succeeded = await perform({

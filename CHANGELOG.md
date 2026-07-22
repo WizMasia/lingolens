@@ -4,6 +4,12 @@ All notable changes to LingoLens are documented here.
 
 ## Unreleased
 
+## 0.1.2
+
+- Translate the browser tab title together with readable page content.
+- Restore the latest page-owned title when translation stops or the source title changes.
+- Preserve site updates by releasing translated-title ownership when the page changes the title.
+
 ## 0.1.1
 
 - Preserve inline code-like literals in their original order and spacing during translation.

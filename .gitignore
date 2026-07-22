@@ -1,5 +1,26 @@
-.worktrees/
+# Dependencies
 node_modules/
+
+# Build and test output
 dist/
 coverage/
+LingoLens-*-unpacked.zip
+
+# Local worktrees and tool state
+.worktrees/
 .superpowers/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and runtime files
+*.log
+*.pid
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp

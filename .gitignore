@@ -6,9 +6,17 @@ dist/
 coverage/
 LingoLens-*-unpacked.zip
 
-# Local worktrees and tool state
-.worktrees/
-.superpowers/
+# Repository metadata and local worktrees
+/.git
+/.worktrees
+
+# Local agent and tool state
+/.superpowers
+/.codegraph
+/.codex
+/.agents
+/.claude
+/.serena
 
 # Local environment and secrets
 .env

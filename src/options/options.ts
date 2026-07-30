@@ -43,6 +43,7 @@ export const createOptionsApp = (
   const form = required(document, "settings-form", HTMLFormElement);
   const source = required(document, "source-language", HTMLSelectElement);
   const target = required(document, "target-language", HTMLSelectElement);
+  const pdfTranslation = required(document, "pdf-translation-enabled", HTMLInputElement);
   const liveChatNano = required(document, "live-chat-nano", HTMLInputElement);
   const controls: Record<ShortcutKind, TriggerControls> = {
     translation: triggerControls(document, "trigger"),
@@ -124,7 +125,17 @@ export const createOptionsApp = (
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void dependencies
-      .save(readSettings(form, source, target, liveChatNano, triggers, dependencies.uiLanguage))
+      .save(
+        readSettings(
+          form,
+          source,
+          target,
+          pdfTranslation,
+          liveChatNano,
+          triggers,
+          dependencies.uiLanguage,
+        ),
+      )
       .then(
         () => {
           status.textContent = "설정을 저장했습니다.";
@@ -147,6 +158,7 @@ export const createOptionsApp = (
     }
     source.value = settings.source.kind === "auto" ? "auto" : settings.source.language;
     target.value = settings.target.kind === "browser" ? "browser" : settings.target.language;
+    pdfTranslation.checked = settings.pdfTranslationEnabled;
     liveChatNano.checked = settings.liveChatNanoEnabled;
     controls.translation.value.textContent = triggerLabel(triggers.translation);
     controls.menu.value.textContent = triggerLabel(triggers.menu);
@@ -158,6 +170,7 @@ const readSettings = (
   form: HTMLFormElement,
   source: HTMLSelectElement,
   target: HTMLSelectElement,
+  pdfTranslation: HTMLInputElement,
   liveChatNano: HTMLInputElement,
   triggers: ShortcutBindings,
   uiLanguage: string,
@@ -173,6 +186,7 @@ const readSettings = (
         target.value === "browser"
           ? { kind: "browser" }
           : { kind: "fixed", language: target.value },
+      pdfTranslationEnabled: pdfTranslation.checked,
       liveChatNanoEnabled: liveChatNano.checked,
       trigger: triggers.translation,
       menuTrigger: triggers.menu,

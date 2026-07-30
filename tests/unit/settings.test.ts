@@ -17,6 +17,7 @@ describe("settings", () => {
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: "ko" },
       liveChatNanoEnabled: false,
+      pdfTranslationEnabled: true,
       trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
       menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
     });
@@ -33,6 +34,14 @@ describe("settings", () => {
     // Then
     expect(parsedEnabled.liveChatNanoEnabled).toBe(true);
     expect(parsedString.liveChatNanoEnabled).toBe(false);
+  });
+
+  it("enables PDF translation by default and preserves a literal false setting", () => {
+    expect(parseSettings(undefined, "ko").pdfTranslationEnabled).toBe(true);
+    expect(parseSettings({ pdfTranslationEnabled: false }, "ko").pdfTranslationEnabled).toBe(false);
+    expect(parseSettings({ pdfTranslationEnabled: "false" }, "ko").pdfTranslationEnabled).toBe(
+      true,
+    );
   });
 
   it("preserves a legacy translation trigger and supplies the menu default", () => {

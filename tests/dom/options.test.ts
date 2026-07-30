@@ -22,6 +22,7 @@ const DEFAULTS: Settings = {
   source: { kind: "auto" },
   target: { kind: "browser", resolvedLanguage: "ko" },
   liveChatNanoEnabled: false,
+  pdfTranslationEnabled: true,
   trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };
@@ -37,6 +38,7 @@ describe("options", () => {
         <button type="button" id="menu-trigger-capture"></button><output id="menu-trigger-value"></output>
         <p id="menu-trigger-warning"></p><button type="submit">Save</button><p id="save-status"></p>
         <section>
+          <input type="checkbox" id="pdf-translation-enabled">
           <input type="checkbox" id="live-chat-nano">
           <button type="button" id="prepare-live-chat-nano"></button>
           <p id="nano-status"></p>
@@ -77,6 +79,26 @@ describe("options", () => {
 
     // Then
     expect(save).toHaveBeenCalledWith({ ...DEFAULTS, liveChatNanoEnabled: true });
+  });
+
+  it("loads and saves the PDF translation toggle", async () => {
+    const save = vi.fn<(settings: Settings) => Promise<void>>().mockResolvedValue();
+    const app = createOptionsApp(document, {
+      load: async () => DEFAULTS,
+      save,
+      uiLanguage: "ko",
+    });
+    await app.ready;
+
+    const toggle = document.querySelector<HTMLInputElement>("#pdf-translation-enabled");
+    expect(toggle?.checked).toBe(true);
+    toggle?.click();
+    document
+      .querySelector<HTMLFormElement>("#settings-form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+
+    expect(save).toHaveBeenCalledWith({ ...DEFAULTS, pdfTranslationEnabled: false });
   });
 
   it("reports unavailable Nano preparation without changing the setting", async () => {

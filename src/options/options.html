@@ -25,6 +25,10 @@
           <label class="field" for="source-language"><span>입력 언어</span><select id="source-language"></select><small>자동 감지는 요소마다 언어를 판별합니다.</small></label>
           <label class="field" for="target-language"><span>도착 언어</span><select id="target-language"></select><small>브라우저 언어를 알 수 없으면 한국어를 사용합니다.</small></label>
         </div>
+        <section class="pdf-section" aria-labelledby="pdf-title">
+          <div><h2 id="pdf-title">PDF 번역</h2><p>PDF는 별도의 LingoLens 뷰어에서 엽니다.</p></div>
+          <label class="choice"><input type="checkbox" id="pdf-translation-enabled" /> <span><strong>PDF 호버 번역 사용</strong><small>텍스트 PDF만 지원합니다. 현재 버전은 스캔 문서와 이미지 PDF의 OCR을 지원하지 않습니다.</small></span></label>
+        </section>
         <section class="trigger-section" aria-labelledby="trigger-title">
           <div><h2 id="trigger-title">번역 토글 키</h2><p>요소를 번역하거나 원문으로 복원합니다.</p></div>
           <div class="trigger-control"><button type="button" id="trigger-capture" class="button secondary-button" aria-label="번역 토글 키 변경">키 변경</button><output id="trigger-value" class="keycap" aria-label="현재 번역 토글 키" aria-live="polite">Ctrl</output></div>

@@ -7,6 +7,7 @@ const settings = (source: Settings["source"], target: Settings["target"]): Setti
   source,
   target,
   liveChatNanoEnabled: false,
+  pdfTranslationEnabled: true,
   trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 });

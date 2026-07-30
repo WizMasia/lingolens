@@ -32,6 +32,7 @@ const settings: Settings = {
   source: { kind: "auto" },
   target: { kind: "browser", resolvedLanguage: "ko" },
   liveChatNanoEnabled: false,
+  pdfTranslationEnabled: true,
   trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
   menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
 };

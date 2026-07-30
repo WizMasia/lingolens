@@ -19,6 +19,7 @@ export type Settings = Readonly<{
   source: SourcePreference;
   target: TargetPreference;
   liveChatNanoEnabled: boolean;
+  pdfTranslationEnabled: boolean;
   trigger: TriggerBinding;
   menuTrigger: TriggerBinding;
 }>;
@@ -120,6 +121,7 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
       source: { kind: "auto" },
       target: { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
       liveChatNanoEnabled: false,
+      pdfTranslationEnabled: true,
       trigger: DEFAULT_TRIGGER,
       menuTrigger: DEFAULT_MENU_TRIGGER,
     };
@@ -145,6 +147,8 @@ export function parseSettings(value: unknown, uiLanguage: string): Settings {
         ? parseTarget(value.target, uiLanguage)
         : { kind: "browser", resolvedLanguage: resolveBrowserTarget(uiLanguage) },
     liveChatNanoEnabled: "liveChatNanoEnabled" in value && value.liveChatNanoEnabled === true,
+    pdfTranslationEnabled:
+      !("pdfTranslationEnabled" in value) || value.pdfTranslationEnabled !== false,
     trigger,
     menuTrigger,
   };

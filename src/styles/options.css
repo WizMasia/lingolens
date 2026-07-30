@@ -18,6 +18,7 @@ form {
 }
 fieldset,
 .trigger-section,
+.pdf-section,
 .nano-section {
   margin: 0;
   padding: var(--lt-space-4);
@@ -64,11 +65,19 @@ legend {
   display: grid;
   gap: var(--lt-space-3);
 }
+.pdf-section {
+  display: grid;
+  gap: var(--lt-space-3);
+}
 .nano-section {
   display: grid;
   gap: var(--lt-space-3);
 }
 .trigger-section h2 + p {
+  margin-block-start: var(--lt-space-1);
+  color: rgb(23 32 27 / 66%);
+}
+.pdf-section h2 + p {
   margin-block-start: var(--lt-space-1);
   color: rgb(23 32 27 / 66%);
 }

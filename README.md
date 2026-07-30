@@ -1,6 +1,6 @@
 # LingoLens
 
-LingoLens is a Chrome extension for translating ordinary HTTP and HTTPS web-page text with Chrome-managed, on-device language detection and translation models. It keeps translation work in the browser rather than sending page text to a LingoLens translation service.
+LingoLens is a Chrome extension for translating ordinary HTTP and HTTPS web-page text and text-based PDFs with Chrome-managed, on-device language detection and translation models. It keeps translation work in the browser rather than sending page text to a LingoLens translation service.
 
 **Why LingoLens?** “Lingo” evokes language. It also deliberately echoes *ringo* (りんご), the Japanese word for apple, matching the apple-frame icon. “Lingo” itself does not mean apple in Japanese.
 
@@ -34,11 +34,14 @@ bun run build
 - **An element:** by default, press `Ctrl` while text is selected or while the pointer is over a text element. Use the same trigger again to restore that element.
 - **Retranslation and language menu:** press the language-menu trigger (`Ctrl + Shift` by default) over an eligible element. The floating menu lets you choose source and target languages, shows the detected source, and offers **Translate again** or restore.
 - **Inline or hover display:** open **설정** and choose **원문 아래 표시** to add a translation after the source text, or **호버 시 교체** to show the translation while the element is hovered or focused.
+- **A text PDF:** enable **PDF hover translation** in Settings, then use **현재 PDF 열기** or **내 컴퓨터에서 열기** in the popup. LingoLens opens its own lightweight viewer; hover or focus a detected paragraph to show its translation. The viewer retains page navigation, zoom, fit, search, rotation, download, and print controls.
 - **Language and shortcut settings:** in **번역 설정**, choose **입력 언어**, **도착 언어**, **번역 토글 키**, and **언어 메뉴 키**, then select **설정 저장**.
 
 Automatic detection can be uncertain for short text. If LingoLens asks for a language or chooses poorly, open the element language menu and select an explicit source language.
 
-LingoLens does not run on browser-internal pages, the Chrome Web Store, PDF viewer internals, images, video subtitles, code blocks, editable fields, or ordinary cross-origin iframe content. The only iframe exception is the dedicated YouTube Live Chat path below.
+LingoLens does not inject into Chrome's built-in PDF viewer. It translates extractable text only after a PDF is opened in the LingoLens viewer. The current version does not use OCR, so scanned documents, image-only PDFs, and text embedded in web-page images are not translated.
+
+LingoLens does not run on other browser-internal pages, the Chrome Web Store, images, video subtitles, code blocks, editable fields, or ordinary cross-origin iframe content. The only iframe exception is the dedicated YouTube Live Chat path below.
 
 ## YouTube Live Chat status
 

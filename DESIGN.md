@@ -93,6 +93,14 @@ All margins, padding, and gaps use the spacing tokens. The popup is a single com
 - **Accessibility**: hover never inserts focusable controls, changes page DOM order, or adds tab stops. Existing focusable source elements support keyboard activation; the independently configurable menu trigger opens retranslation controls for any translated source. Status and errors use the persistent extension live announcer.
 - **Motion**: no injected hover surface or decorative movement. Reduced-motion behavior is unchanged.
 
+### PDF Viewer and Translation Overlay
+
+- **Structure**: a compact sticky toolbar sits above the PDF.js document surface. Navigation, zoom, fit, search, rotation, download, print, and settings remain native buttons and fields.
+- **Translation**: hovering or focusing a detected text paragraph shows an extension-owned paper overlay aligned to that paragraph. The overlay contains plain translated text, uses `pointer-events: none`, and closes on pointer leave, blur, Escape, page change, or feature disable.
+- **States**: loading reports local-model progress; unavailable and OCR-only documents retain the original PDF and show textual guidance. Disabling PDF translation destroys translation resources but leaves the document readable.
+- **Accessibility**: paragraph proxies provide keyboard focus without changing PDF text order. The source text layer remains available for selection and search, and the overlay sets translated language and direction.
+- **Scope**: only extractable PDF text is supported. Scanned and image-only PDFs require OCR and are explicitly outside the current release.
+
 ### Field Group
 
 - **Structure**: visible label, native input or select, optional helper text, inline error.

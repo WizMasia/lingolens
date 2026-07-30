@@ -21,6 +21,7 @@ The first release supports PDFs that already contain extractable text. It does n
 - Reuse cached results when the same paragraph is visited again.
 - Recalculate overlay geometry after zoom or rotation without retranslating.
 - Show clear model, language-pair, loading, and failure states.
+- Let the user enable or disable PDF hover translation in Options.
 
 ### Explicitly excluded
 
@@ -55,6 +56,8 @@ The popup adds two secondary actions:
 
 - **Open current PDF in LingoLens**
 - **Open PDF from this computer**
+
+Both actions remain visible for discoverability. When PDF hover translation is disabled, they are disabled and their helper text points to the PDF setting in Options.
 
 For a remote source, the background coordinator reads the active tab URL and opens the extension viewer with that URL as its source. The viewer accepts only `http:` and `https:` URLs, fetches under the existing host permissions, and verifies that the response can be parsed as a PDF. A filename suffix or response `Content-Type` is useful evidence but is not trusted as the sole validation.
 
@@ -115,6 +118,16 @@ Paragraph records are created when a page's text layer is ready. Records for pag
 
 The PDF viewer creates the existing Chromium AI adapter and translation engine in its top-level window. It reuses global source and target settings, language detection, language-pair availability checks, translator reuse, bounded result caching, in-flight request deduplication, and Korean error copy.
 
+Options stores a `pdfTranslationEnabled` boolean with the existing synchronized settings. It defaults to `true` because PDF processing is already user-initiated and never starts merely by visiting a PDF URL.
+
+When the setting changes:
+
+- the existing storage-change broadcast reaches open PDF viewer tabs;
+- disabling removes paragraph hover and focus behavior, closes the active overlay, cancels pending activation, and destroys the viewer's translation engine;
+- the PDF remains open with its approved PDF.js reading controls;
+- enabling creates a fresh translation engine and restores paragraph interaction without reloading the PDF;
+- the popup updates both PDF actions immediately.
+
 The PDF feature receives plain paragraph text directly. It does not force PDF paragraphs through the existing `HTMLElement` translation controller or element record store because those units own host-page DOM restoration and stale-content behavior that PDF canvas pages do not share.
 
 One small PDF paragraph controller owns:
@@ -153,6 +166,14 @@ The viewer shows this persistent compact notice:
 
 > 텍스트 PDF만 번역할 수 있습니다. 현재 버전은 스캔 문서와 이미지 PDF의 OCR을 지원하지 않습니다.
 
+Options includes a checkbox labeled:
+
+> PDF 호버 번역 사용
+
+Its helper copy states that PDF files open in a separate LingoLens viewer and that the current version does not support OCR. When the setting is disabled in an open viewer, the translation notice is replaced by:
+
+> PDF 호버 번역이 설정에서 꺼져 있습니다.
+
 When a parsed document has no extractable text, the viewer shows:
 
 > 번역할 수 있는 텍스트를 찾지 못했습니다. 이미지로 구성된 PDF일 수 있으며, 현재 버전에서는 OCR을 지원하지 않습니다.
@@ -174,6 +195,7 @@ The empty-text state does not call the language detector or translator. A docume
 
 - Invalid or non-PDF source: explain that the current tab could not be opened as a PDF and offer local file selection.
 - Remote fetch rejected: explain that protected PDFs may need to be downloaded and opened locally.
+- PDF hover translation disabled: keep the PDF readable, do not create an AI adapter, and link to Options.
 - Password-protected PDF: report that password-protected documents are not supported in the first version and do not request or store a password.
 - Corrupt PDF: report a document-open failure without starting translation.
 - No extractable text: show the OCR-specific empty state.
@@ -188,6 +210,10 @@ The empty-text state does not call the language detector or translator. A docume
 ### Automated
 
 - Source validation accepts remote HTTP/HTTPS and local PDF bytes while rejecting other schemes and non-PDF data.
+- Settings parsing defaults PDF hover translation to enabled and preserves explicit disablement.
+- Popup PDF actions and open viewer behavior update when the PDF setting changes.
+- Disabling destroys translation resources and closes the overlay without unloading the PDF.
+- Re-enabling restores paragraph interaction with a fresh engine without reloading the PDF.
 - Tagged paragraph grouping honors structure boundaries.
 - Geometric grouping keeps columns separate, joins wrapped lines, and separates large vertical gaps.
 - Paragraph identity remains stable across zoom and rotation.

@@ -174,11 +174,11 @@ Its helper copy states that PDF files open in a separate LingoLens viewer and th
 
 > PDF 호버 번역이 설정에서 꺼져 있습니다.
 
-When a parsed document has no extractable text, the viewer shows:
+When a rendered page has no extractable text, the viewer shows:
 
 > 번역할 수 있는 텍스트를 찾지 못했습니다. 이미지로 구성된 PDF일 수 있으며, 현재 버전에서는 OCR을 지원하지 않습니다.
 
-The empty-text state does not call the language detector or translator. A document with some text remains usable; image-only pages show no paragraph targets.
+The empty-text state does not call the language detector or translator. The viewer does not scan every unrendered page only to classify the whole document. A document with some text remains usable; image-only pages show no paragraph targets and later text pages remain translatable.
 
 ## 10. Security and Privacy
 
@@ -198,7 +198,7 @@ The empty-text state does not call the language detector or translator. A docume
 - PDF hover translation disabled: keep the PDF readable, do not create an AI adapter, and link to Options.
 - Password-protected PDF: report that password-protected documents are not supported in the first version and do not request or store a password.
 - Corrupt PDF: report a document-open failure without starting translation.
-- No extractable text: show the OCR-specific empty state.
+- No extractable text on a rendered page: show the OCR-specific empty state without scanning every unopened page.
 - API unavailable: reuse the existing on-device translation unavailable message.
 - Model downloading: keep the source readable and show progress in the viewer status.
 - Unknown source language: ask the user to set a fixed global source language in Options.
@@ -220,7 +220,7 @@ The empty-text state does not call the language detector or translator. A docume
 - Hover waits 200 ms, movement within one paragraph keeps the overlay, and leaving closes it.
 - A late translation cannot reopen a closed or superseded overlay.
 - Repeated paragraph visits reuse the translation result.
-- Empty-text documents produce the OCR-specific state without an AI call.
+- Empty-text rendered pages produce the OCR-specific state without an AI call.
 - Viewer events update geometry without retranslating.
 - Keyboard roving focus opens, moves, and closes the overlay.
 - Translated output is rendered as text and respects language direction.

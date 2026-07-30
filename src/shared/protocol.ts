@@ -13,6 +13,7 @@ export const MAX_NANO_CONTEXT_LENGTH = 160;
 export type RuntimeMessage =
   | { readonly type: "translate-page" }
   | { readonly type: "restore-page" }
+  | { readonly type: "open-pdf-viewer"; readonly source: "current-tab" | "local" }
   | { readonly type: "start-live-chat" }
   | { readonly type: "stop-live-chat" }
   | { readonly type: "nano-session-authorized" }
@@ -96,6 +97,10 @@ export function parseMessage(value: unknown): RuntimeMessage | undefined {
       return { type: "translate-page" };
     case "restore-page":
       return { type: "restore-page" };
+    case "open-pdf-viewer":
+      return "source" in value && (value.source === "current-tab" || value.source === "local")
+        ? { type: "open-pdf-viewer", source: value.source }
+        : undefined;
     case "start-live-chat":
       return { type: "start-live-chat" };
     case "stop-live-chat":

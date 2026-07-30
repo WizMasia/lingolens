@@ -3,6 +3,7 @@ import { isYouTubeLiveChatUrl } from "../frame-registry";
 import { createLiveChatIntentTracker } from "../live-chat-intent";
 import type { LiveChatStateStore } from "../live-chat-state";
 import { parseMessage, type RuntimeMessage, type TabState } from "../shared/protocol";
+import type { Settings } from "../shared/settings";
 import type { NanoOffscreenBridge } from "./nano-offscreen-bridge";
 
 export type { LiveChatStateStore };
@@ -26,6 +27,8 @@ export type BackgroundDependencies = Readonly<{
   isNanoAuthorizationSender?(url: string | undefined): boolean;
   broadcastSettings(): void;
   requestTabState(tabId: number): Promise<TabState>;
+  getSettings?(): Promise<Settings>;
+  openPdfViewer?(sourceUrl?: string): Promise<void>;
 }>;
 
 export type ActiveTab = Readonly<{
@@ -134,6 +137,19 @@ export const createBackgroundCoordinator = (
         case "settings-changed":
           dependencies.broadcastSettings();
           return undefined;
+        case "open-pdf-viewer": {
+          if (dependencies.openPdfViewer === undefined) return undefined;
+          const settings = await dependencies.getSettings?.();
+          if (settings?.pdfTranslationEnabled === false) return undefined;
+          if (message.source === "local") {
+            await dependencies.openPdfViewer();
+            return undefined;
+          }
+          const tab = await dependencies.activeTab();
+          if (tab?.url === undefined || !isHttpUrl(tab.url)) return undefined;
+          await dependencies.openPdfViewer(tab.url);
+          return undefined;
+        }
         case "nano-session-authorized":
           if (senderTabId === undefined && isNanoAuthorizationSender(senderUrl)) {
             nanoSessionAuthorized = true;
@@ -219,4 +235,13 @@ export const createBackgroundCoordinator = (
 
 const assertNever = (value: never): never => {
   throw new TypeError(`Unhandled message: ${String(value)}`);
+};
+
+const isHttpUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 };

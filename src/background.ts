@@ -3,6 +3,7 @@ import { createNanoOffscreenBridge } from "./background/nano-offscreen-bridge";
 import { createFrameRegistry, type FrameEndpoint, isYouTubeLiveChatUrl } from "./frame-registry";
 import { createLiveChatStateStore } from "./live-chat-state";
 import { parseMessage, type TabState } from "./shared/protocol";
+import { parseSettings } from "./shared/settings";
 
 export {
   type ActiveTab,
@@ -76,6 +77,15 @@ if (typeof chrome !== "undefined") {
       );
       const message = parseMessage({ type: "tab-state", state: response });
       return message?.type === "tab-state" ? message.state : IDLE_STATE;
+    },
+    async getSettings() {
+      const stored = await chrome.storage.sync.get("settings");
+      return parseSettings(stored["settings"], chrome.i18n.getUILanguage());
+    },
+    async openPdfViewer(sourceUrl) {
+      const viewerUrl = new URL(chrome.runtime.getURL("pdf-viewer.html"));
+      if (sourceUrl !== undefined) viewerUrl.searchParams.set("url", sourceUrl);
+      await chrome.tabs.create({ url: viewerUrl.href });
     },
   });
   chrome.runtime.onMessage.addListener((value: unknown, sender) =>

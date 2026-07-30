@@ -3,6 +3,7 @@ import { createBackgroundCoordinator } from "../../src/background";
 import type { NanoOffscreenBridge } from "../../src/background/nano-offscreen-bridge";
 import type { NanoLanguageDecision } from "../../src/content/nano-language-detector";
 import type { TabState } from "../../src/shared/protocol";
+import { parseSettings } from "../../src/shared/settings";
 
 const complete: TabState = {
   phase: "complete",
@@ -37,6 +38,46 @@ const createNanoBridge = (): NanoOffscreenBridge => ({
 });
 
 describe("background coordinator", () => {
+  it("opens web PDF sources and local picker tabs only while the option is enabled", async () => {
+    const openPdfViewer = vi.fn<(url?: string) => Promise<void>>().mockResolvedValue();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: "https://example.com/report.pdf" }),
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+      getSettings: async () => parseSettings(undefined, "ko"),
+      openPdfViewer,
+    });
+
+    await coordinator.receive({ type: "open-pdf-viewer", source: "current-tab" });
+    await coordinator.receive({ type: "open-pdf-viewer", source: "local" });
+
+    expect(openPdfViewer).toHaveBeenNthCalledWith(1, "https://example.com/report.pdf");
+    expect(openPdfViewer).toHaveBeenNthCalledWith(2);
+  });
+
+  it("does not open forged, disabled, or non-web PDF viewer requests", async () => {
+    const openPdfViewer = vi.fn<(url?: string) => Promise<void>>().mockResolvedValue();
+    const coordinator = createBackgroundCoordinator({
+      activeTab: async () => ({ id: 7, url: "chrome://settings" }),
+      sendToTop: vi.fn(),
+      sendToLiveChat: vi.fn(),
+      liveChatState: createLiveChatState(),
+      broadcastSettings: vi.fn(),
+      requestTabState: vi.fn(),
+      getSettings: async () => parseSettings({ pdfTranslationEnabled: false }, "ko"),
+      openPdfViewer,
+    });
+
+    await coordinator.receive({ type: "open-pdf-viewer", source: "current-tab" });
+    await coordinator.receive({ type: "open-pdf-viewer", source: "local" });
+    await coordinator.receive({ type: "open-pdf-viewer", source: "file-url" });
+
+    expect(openPdfViewer).not.toHaveBeenCalled();
+  });
+
   it("stores tab state and returns it for the active tab", async () => {
     const broadcast = vi.fn();
     const coordinator = createBackgroundCoordinator({

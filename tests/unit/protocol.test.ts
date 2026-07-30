@@ -6,6 +6,18 @@ describe("runtime message protocol", () => {
     expect(parseMessage({ type: "translate-page" })).toEqual({ type: "translate-page" });
   });
 
+  it("parses PDF viewer commands and rejects unknown sources", () => {
+    expect(parseMessage({ type: "open-pdf-viewer", source: "current-tab" })).toEqual({
+      type: "open-pdf-viewer",
+      source: "current-tab",
+    });
+    expect(parseMessage({ type: "open-pdf-viewer", source: "local" })).toEqual({
+      type: "open-pdf-viewer",
+      source: "local",
+    });
+    expect(parseMessage({ type: "open-pdf-viewer", source: "file-url" })).toBeUndefined();
+  });
+
   it("parses a start-live-chat command", () => {
     expect(parseMessage({ type: "start-live-chat" })).toEqual({ type: "start-live-chat" });
   });

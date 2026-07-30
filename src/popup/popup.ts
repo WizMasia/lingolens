@@ -22,6 +22,9 @@ export const createPopupApp = (document: Document, dependencies: PopupDependenci
   const error = required(document, "error", HTMLParagraphElement);
   const translate = required(document, "translate-page", HTMLButtonElement);
   const restore = required(document, "restore-page", HTMLButtonElement);
+  const openCurrentPdf = required(document, "open-current-pdf", HTMLButtonElement);
+  const openLocalPdf = required(document, "open-local-pdf", HTMLButtonElement);
+  const pdfHelper = required(document, "pdf-helper", HTMLParagraphElement);
   const options = required(document, "open-options", HTMLButtonElement);
 
   const render = (state: TabState): void => {
@@ -48,6 +51,14 @@ export const createPopupApp = (document: Document, dependencies: PopupDependenci
 
   translate.addEventListener("click", () => void run({ type: "translate-page" }));
   restore.addEventListener("click", () => void run({ type: "restore-page" }));
+  openCurrentPdf.addEventListener(
+    "click",
+    () => void run({ type: "open-pdf-viewer", source: "current-tab" }),
+  );
+  openLocalPdf.addEventListener(
+    "click",
+    () => void run({ type: "open-pdf-viewer", source: "local" }),
+  );
   options.addEventListener("click", dependencies.openOptions);
 
   const renderSettings = (settings: Settings): void => {
@@ -57,6 +68,11 @@ export const createPopupApp = (document: Document, dependencies: PopupDependenci
         ? settings.target.language
         : settings.target.resolvedLanguage;
     activeTarget.textContent = `도착 언어: ${languageLabel(target)}`;
+    openCurrentPdf.disabled = !settings.pdfTranslationEnabled;
+    openLocalPdf.disabled = !settings.pdfTranslationEnabled;
+    pdfHelper.textContent = settings.pdfTranslationEnabled
+      ? "텍스트 PDF를 별도 LingoLens 뷰어에서 엽니다. OCR은 지원하지 않습니다."
+      : "PDF 호버 번역이 설정에서 꺼져 있습니다.";
   };
   return {
     ready: Promise.all([

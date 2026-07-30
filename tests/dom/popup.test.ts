@@ -33,6 +33,7 @@ const fixture = (): PopupDependencies & { sent: RuntimeMessage[] } => {
         source: { kind: "auto" },
         target: { kind: "fixed", language: "ja" },
         liveChatNanoEnabled: false,
+        pdfTranslationEnabled: true,
         trigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: false },
         menuTrigger: { key: "Control", ctrl: false, alt: false, meta: false, shift: true },
       }) satisfies Settings,
@@ -49,6 +50,8 @@ describe("popup", () => {
       <main><p id="status"></p><progress id="progress"></progress>
       <p id="counts"></p><p id="active-mode"></p><p id="active-target"></p><p id="error"></p>
       <button id="translate-page"></button><button id="restore-page"></button>
+      <button id="open-current-pdf"></button><button id="open-local-pdf"></button>
+      <p id="pdf-helper"></p>
       <button id="open-options"></button></main>`;
   });
 
@@ -90,5 +93,30 @@ describe("popup", () => {
     await app.ready;
     expect(document.querySelector("#active-mode")?.textContent).toContain("호버");
     expect(document.querySelector("#active-target")?.textContent).toContain("일본어");
+  });
+
+  it("opens current and local PDFs through the background coordinator", async () => {
+    const dependencies = fixture();
+    const app = createPopupApp(document, dependencies);
+    await app.ready;
+    document.querySelector<HTMLButtonElement>("#open-current-pdf")?.click();
+    document.querySelector<HTMLButtonElement>("#open-local-pdf")?.click();
+    await Promise.resolve();
+    expect(dependencies.sent).toContainEqual({
+      type: "open-pdf-viewer",
+      source: "current-tab",
+    });
+    expect(dependencies.sent).toContainEqual({ type: "open-pdf-viewer", source: "local" });
+  });
+
+  it("disables PDF actions and explains the option when PDF translation is off", async () => {
+    const dependencies = fixture();
+    const enabled = await dependencies.getSettings();
+    dependencies.getSettings = async () => ({ ...enabled, pdfTranslationEnabled: false });
+    const app = createPopupApp(document, dependencies);
+    await app.ready;
+    expect(document.querySelector<HTMLButtonElement>("#open-current-pdf")?.disabled).toBe(true);
+    expect(document.querySelector<HTMLButtonElement>("#open-local-pdf")?.disabled).toBe(true);
+    expect(document.querySelector("#pdf-helper")?.textContent).toContain("꺼져 있습니다");
   });
 });

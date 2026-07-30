@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LingoLens PDF</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/shell.css" />
+    <link rel="stylesheet" href="styles/pdfjs-viewer.css" />
+    <link rel="stylesheet" href="styles/pdf.css" />
+  </head>
+  <body class="lt-pdf-shell">
+    <header class="lt-pdf-toolbar" role="toolbar" aria-label="PDF 도구 모음">
+      <div class="lt-pdf-brand">
+        <span class="eyebrow">LINGOLENS</span>
+        <strong>PDF</strong>
+      </div>
+      <div class="lt-pdf-control-group">
+        <label class="button secondary-button lt-pdf-file-button" for="pdf-file">PDF 열기</label>
+        <input id="pdf-file" type="file" accept="application/pdf,.pdf" />
+        <button id="previous-page" class="button secondary-button" type="button" aria-label="이전 페이지">이전</button>
+        <label class="lt-pdf-page-field"><input id="page-number" type="number" min="1" value="1" aria-label="현재 페이지" /> / <span id="page-count">0</span></label>
+        <button id="next-page" class="button secondary-button" type="button" aria-label="다음 페이지">다음</button>
+      </div>
+      <div class="lt-pdf-control-group">
+        <button id="zoom-out" class="button secondary-button" type="button" aria-label="축소">−</button>
+        <output id="zoom-value" aria-label="확대 비율">100%</output>
+        <button id="zoom-in" class="button secondary-button" type="button" aria-label="확대">+</button>
+        <button id="fit-width" class="button secondary-button" type="button">너비 맞춤</button>
+        <button id="fit-page" class="button secondary-button" type="button">페이지 맞춤</button>
+      </div>
+      <form id="pdf-search" class="lt-pdf-search">
+        <input id="search-query" type="search" placeholder="PDF에서 찾기" aria-label="PDF에서 찾기" />
+        <button class="button secondary-button" type="submit">찾기</button>
+        <output id="search-count" aria-live="polite"></output>
+      </form>
+      <div class="lt-pdf-control-group">
+        <button id="rotate" class="button secondary-button" type="button">회전</button>
+        <button id="download" class="button secondary-button" type="button">다운로드</button>
+        <button id="print" class="button secondary-button" type="button">인쇄</button>
+        <button id="open-options" class="button secondary-button" type="button">설정</button>
+      </div>
+    </header>
+    <section class="lt-pdf-notices" aria-label="PDF 번역 상태">
+      <p id="pdf-status" role="status" aria-live="polite">PDF 파일을 여세요.</p>
+      <p id="pdf-scope">텍스트 PDF만 번역할 수 있습니다. 현재 버전은 스캔 문서와 이미지 PDF의 OCR을 지원하지 않습니다.</p>
+    </section>
+    <main class="lt-pdf-stage">
+      <div id="viewerContainer" tabindex="-1">
+        <div id="viewer" class="pdfViewer"></div>
+      </div>
+    </main>
+    <div id="print-container" aria-hidden="true"></div>
+    <script src="pdf-viewer.js"></script>
+  </body>
+</html>

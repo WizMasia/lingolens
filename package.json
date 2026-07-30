@@ -10,7 +10,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "pdfjs-dist": "6.2.108"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.3",

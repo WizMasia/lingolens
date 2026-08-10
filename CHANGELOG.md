@@ -4,6 +4,8 @@ All notable changes to LingoLens are documented here.
 
 ## Unreleased
 
+## 0.2.0
+
 - Add an optional text-PDF viewer with paragraph-level hover and keyboard translation overlays.
 - Keep page navigation, zoom, fit, search, rotation, download, and print available in the PDF surface.
 - Explicitly defer OCR for scanned documents, image-only PDFs, and web-page images.

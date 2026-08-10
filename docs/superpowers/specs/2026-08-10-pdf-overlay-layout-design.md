@@ -19,14 +19,15 @@ GitHub tracking issue: [#1](https://github.com/WizMasia/lingolens/issues/1)
 
 Translate each detected paragraph once as a complete string after inline annotations have been normalized. Do not translate line by line and do not insert source visual line breaks into the request. The browser lays the translated text out naturally inside the source paragraph width.
 
-Compute the representative height as the character-weighted median of all non-whitespace fragment heights. Treat a fragment as an inline annotation only when both conditions hold:
+Treat a fragment as an inline annotation only when all conditions hold:
 
-1. Its height is at most 75% of the representative height.
-2. Its baseline differs by at least 20% of the representative height from the nearest preceding or following body-sized fragment in reading order.
+1. Its height is at most 75% of an adjacent body-sized fragment's height.
+2. Its baseline differs by at least 20% and at most 120% of that adjacent fragment's height.
+3. Its horizontal gap from that adjacent fragment is no more than 1.5 times the adjacent fragment's height.
 
 This keeps ordinary small footnote paragraphs translatable: when every fragment in a footnote uses the same small size, that size is the paragraph's representative body size. If classification would leave no body text, treat every fragment as body text.
 
-For untagged PDF content, associate an annotation candidate with an adjacent body-sized fragment before geometric line and paragraph grouping. The candidate must be no more than 75% of the adjacent fragment's height, have a baseline offset of at least 20% of that height, and be separated horizontally by no more than 1.5 times that height. Choose the closest qualifying preceding or following fragment in reading order. The annotation then inherits its anchor fragment's line and paragraph membership; a candidate with no qualifying anchor remains ordinary standalone text.
+For untagged PDF content, associate an annotation candidate with an adjacent body-sized fragment before geometric line and paragraph grouping. Choose the closest qualifying preceding or following fragment in reading order. The annotation then inherits its anchor fragment's line and paragraph membership; a candidate with no qualifying anchor remains ordinary standalone text.
 
 ### Annotation normalization
 

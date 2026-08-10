@@ -22,7 +22,7 @@ export function createPdfOverlay(
     const width = Math.min(right - left, window.innerWidth - margin * 2);
     const x = Math.min(Math.max(left, margin), window.innerWidth - width - margin);
     overlay.style.inlineSize = `${width}px`;
-    overlay.style.insetInlineStart = `${x}px`;
+    overlay.style.left = `${x}px`;
     overlay.style.fontSize = representativeFontSize(document, target.bodySpans) ?? "1rem";
     overlay.style.insetBlockStart = `${margin}px`;
     const height = overlay.getBoundingClientRect().height;
@@ -47,9 +47,9 @@ export function createPdfOverlay(
     },
     showResult(target, result) {
       if (result.kind === "translated") {
-        show(target, result.text);
         overlay.lang = result.targetLanguage;
         overlay.dir = isRtl(result.targetLanguage) ? "rtl" : "ltr";
+        show(target, result.text);
         return;
       }
       show(

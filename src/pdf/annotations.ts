@@ -14,7 +14,7 @@ export const associateAnnotations = (
   fragments: readonly PdfTextFragment[],
   indexes: readonly number[],
 ): AnnotationAssociation => {
-  const annotationsByAnchor = new Map<number, number[]>();
+  const anchorByAnnotation = new Map<number, number>();
   const annotationIndexes = new Set<number>();
 
   for (const [position, candidateIndex] of indexes.entries()) {
@@ -26,10 +26,20 @@ export const associateAnnotations = (
           horizontalGap(candidate, left.fragment) - horizontalGap(candidate, right.fragment),
       )[0];
     if (anchor === undefined) continue;
-    const annotations = annotationsByAnchor.get(anchor.index) ?? [];
-    annotations.push(candidateIndex);
-    annotationsByAnchor.set(anchor.index, annotations);
+    anchorByAnnotation.set(candidateIndex, anchor.index);
     annotationIndexes.add(candidateIndex);
+  }
+
+  const annotationsByAnchor = new Map<number, number[]>();
+  for (const candidateIndex of indexes) {
+    let anchorIndex = anchorByAnnotation.get(candidateIndex);
+    if (anchorIndex === undefined) continue;
+    while (annotationIndexes.has(anchorIndex)) {
+      anchorIndex = requiredAtMap(anchorByAnnotation, anchorIndex);
+    }
+    const annotations = annotationsByAnchor.get(anchorIndex) ?? [];
+    annotations.push(candidateIndex);
+    annotationsByAnchor.set(anchorIndex, annotations);
   }
 
   return {
@@ -78,5 +88,11 @@ const horizontalGap = (left: PdfTextFragment, right: PdfTextFragment): number =>
 const requiredAt = <Value>(values: readonly Value[], index: number): Value => {
   const value = values[index];
   if (value === undefined) throw new RangeError(`Missing PDF item at index ${index}`);
+  return value;
+};
+
+const requiredAtMap = <Key, Value>(values: ReadonlyMap<Key, Value>, key: Key): Value => {
+  const value = values.get(key);
+  if (value === undefined) throw new RangeError(`Missing PDF annotation anchor at index ${key}`);
   return value;
 };

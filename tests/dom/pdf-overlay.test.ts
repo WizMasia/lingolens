@@ -56,6 +56,47 @@ describe("PDF translation overlay", () => {
     expect(overlay?.dir).toBe("ltr");
   });
 
+  it("keeps RTL results physically aligned and viewport-clamped before measuring", () => {
+    let sourceLeft = 100;
+    const body = document.createElement("span");
+    body.textContent = "Source";
+    Object.defineProperty(body, "getClientRects", {
+      value: () => [{ left: sourceLeft, top: 80, right: sourceLeft + 180, bottom: 100 }],
+    });
+    document.body.append(body);
+    const target: PdfParagraphTarget = {
+      id: "rtl",
+      text: "Source",
+      pageNumber: 1,
+      spans: [body],
+      bodySpans: [body],
+    };
+    const view = createPdfOverlay(document);
+    const overlay = document.querySelector<HTMLElement>(".lt-pdf-translation-overlay");
+    if (overlay === null) throw new TypeError("Missing PDF translation overlay");
+    const metadataAtMeasurement: string[] = [];
+    Object.defineProperty(overlay, "getBoundingClientRect", {
+      value: () => {
+        metadataAtMeasurement.push(`${overlay?.lang}:${overlay?.dir}`);
+        return { height: 40 };
+      },
+    });
+    const rtlResult: TranslationResult = {
+      ...translated,
+      targetLanguage: "ar",
+    };
+
+    view.showResult(target, rtlResult);
+    expect(overlay?.style.left).toBe("100px");
+    expect(overlay?.style.insetInlineStart).toBe("");
+    expect(metadataAtMeasurement).toEqual(["ar:rtl"]);
+
+    sourceLeft = -20;
+    view.refresh(target);
+    expect(overlay?.style.left).toBe("8px");
+    expect(overlay?.style.inlineSize).toBe("180px");
+  });
+
   it.each([
     {
       body: [

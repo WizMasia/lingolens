@@ -118,6 +118,26 @@ describe("PDF paragraph grouping", () => {
     expect(paragraphs[0]?.bodyFragmentIndexes).toEqual([0, 3]);
   });
 
+  it.each([
+    { position: "raised", firstY: 708, secondY: 706 },
+    { position: "lowered", firstY: 692, secondY: 694 },
+  ])("keeps unequal-height adjacent $position annotations attached to body text", ({
+    firstY,
+    secondY,
+  }) => {
+    const paragraphs = groupPdfParagraphs(1, [
+      fragment("Term", 20, 700, undefined, 10),
+      fragment("a", 46, firstY, undefined, 4),
+      fragment("b", 52, secondY, undefined, 6),
+      fragment("continues", 60, 700, undefined, 10),
+    ]);
+
+    expect(paragraphs[0]?.text).toBe("Term continues (a) (b)");
+    expect(paragraphs[0]?.fragmentIndexes).toHaveLength(4);
+    expect([...new Set(paragraphs[0]?.fragmentIndexes)].sort()).toEqual([0, 1, 2, 3]);
+    expect(paragraphs[0]?.bodyFragmentIndexes).toEqual([0, 3]);
+  });
+
   it("keeps a uniformly small footnote as ordinary translatable text", () => {
     const paragraphs = groupPdfParagraphs(1, [
       fragment("1.", 20, 100, undefined, 6),

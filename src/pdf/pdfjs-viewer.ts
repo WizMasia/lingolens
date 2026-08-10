@@ -115,7 +115,7 @@ const paragraphTargets = async (
     page.getStructTree().catch(() => undefined),
   ]);
   const fragments: PdfTextFragment[] = pdfTextFragments(content.items);
-  const spans = [...layer.querySelectorAll<HTMLElement>("span")].filter(
+  const spans = [...layer.querySelectorAll<HTMLElement>('span[role="presentation"]')].filter(
     (span) => span.textContent?.length !== 0,
   );
   if (

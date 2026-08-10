@@ -10,7 +10,7 @@ export type PdfTextFragment = Readonly<{
 }>;
 
 export type PdfStructureBlock = Readonly<{
-  id: string;
+  ids: readonly string[];
   role: string;
 }>;
 
@@ -51,20 +51,21 @@ export function groupPdfParagraphs(
   const usable = fragments
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => item.text.trim().length > 0);
-  const roles = new Map(
-    structure
-      .filter(({ role }) => PARAGRAPH_ROLES.has(role.toLocaleUpperCase("en-US")))
-      .map(({ id, role }) => [id, role]),
-  );
-  const tagged = new Map<string, number[]>();
+  const blocksById = new Map<string, PdfStructureBlock>();
+  for (const block of structure) {
+    if (!PARAGRAPH_ROLES.has(block.role.toLocaleUpperCase("en-US"))) continue;
+    for (const id of block.ids) blocksById.set(id, block);
+  }
+  const tagged = new Map<PdfStructureBlock, number[]>();
   const untagged: number[] = [];
 
   for (const { item, index } of usable) {
     const markedId = item.markedContentId;
-    if (markedId !== undefined && roles.has(markedId)) {
-      const indexes = tagged.get(markedId) ?? [];
+    const block = markedId === undefined ? undefined : blocksById.get(markedId);
+    if (block !== undefined) {
+      const indexes = tagged.get(block) ?? [];
       indexes.push(index);
-      tagged.set(markedId, indexes);
+      tagged.set(block, indexes);
     } else {
       untagged.push(index);
     }

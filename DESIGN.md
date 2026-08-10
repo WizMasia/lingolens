@@ -97,7 +97,7 @@ All margins, padding, and gaps use the spacing tokens. The popup is a single com
 
 - **Structure**: a compact sticky toolbar sits above the PDF.js document surface. Navigation, zoom, fit, search, rotation, download, print, and settings remain native buttons and fields.
 - **Translation**: hovering or focusing a detected text paragraph shows an extension-owned paper overlay aligned to that paragraph. The overlay contains plain translated text, uses `pointer-events: none`, and closes on pointer leave, blur, Escape, page change, or feature disable.
-- **Source geometry**: the overlay follows the detected paragraph's rendered width, clamped only by the viewer margin, and grows vertically with translated content up to the viewport safety cap.
+- **Source geometry**: the overlay follows the detected paragraph's live inline extent—physical width for horizontal text and physical height for 90°/270° rotated text—clamped only by the viewer margin, and grows vertically with translated content up to the viewport safety cap.
 - **Source scale**: translated text uses the character-weighted median font size of body spans; inline superscript and footnote markers do not shrink the translation.
 - **Annotation normalization**: attached superscripts and footnote markers appear as translated parenthetical text after their anchor word.
 - **States**: loading reports local-model progress; unavailable and OCR-only documents retain the original PDF and show textual guidance. Disabling PDF translation destroys translation resources but leaves the document readable.

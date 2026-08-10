@@ -92,7 +92,7 @@ describe("PDF.js viewer text-layer mapping", () => {
       <div class="page" data-page-number="1">
         <div class="textLayer">
           <span class="markedContent">
-            <span role="presentation">Tagged</span><span role="presentation">text</span>
+            <span role="presentation">Tagged</span><span aria-owns="annotation-1">text</span>
           </span>
         </div>
       </div>
@@ -103,7 +103,7 @@ describe("PDF.js viewer text-layer mapping", () => {
     });
   });
 
-  it("maps presentation text spans inside marked-content wrappers to tagged fragments", async () => {
+  it("maps role-less accessible text spans inside marked-content wrappers", async () => {
     const callbacks = {
       onEmptyPage: vi.fn(),
       onGeometryChange: vi.fn(),
@@ -122,7 +122,7 @@ describe("PDF.js viewer text-layer mapping", () => {
 
     await vi.waitFor(() => expect(callbacks.onParagraphs).toHaveBeenCalledOnce());
 
-    const spans = layer.querySelectorAll<HTMLElement>('span[role="presentation"]');
+    const spans = layer.querySelectorAll<HTMLElement>("span:not(.markedContent)");
     expect(callbacks.onParagraphs).toHaveBeenCalledWith(
       1,
       layer,

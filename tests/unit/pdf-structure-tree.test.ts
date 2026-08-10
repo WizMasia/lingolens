@@ -17,6 +17,29 @@ describe("PDF structure tree", () => {
           },
         ],
       }),
-    ).toEqual([{ id: "mc1", role: "P" }]);
+    ).toEqual([{ ids: ["mc1"], role: "P" }]);
+  });
+
+  it("keeps distinct content identifiers in one inherited semantic block", () => {
+    expect(
+      pdfStructureBlocks({
+        role: "Root",
+        children: [
+          {
+            role: "P",
+            children: [
+              {
+                role: "NonStruct",
+                children: [
+                  { type: "content", id: "body" },
+                  { type: "content", id: "marker" },
+                  { type: "content", id: "tail" },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([{ ids: ["body", "marker", "tail"], role: "P" }]);
   });
 });

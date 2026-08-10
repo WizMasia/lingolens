@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { associateAnnotations } from "../../src/pdf/annotations";
 import {
   groupPdfParagraphs,
   type PdfStructureBlock,
@@ -28,8 +29,8 @@ describe("PDF paragraph grouping", () => {
       fragment("Second", 20, 685, "b"),
     ];
     const blocks: PdfStructureBlock[] = [
-      { id: "a", role: "P" },
-      { id: "b", role: "H2" },
+      { ids: ["a"], role: "P" },
+      { ids: ["b"], role: "H2" },
     ];
 
     expect(groupPdfParagraphs(1, fragments, blocks).map(({ text }) => text)).toEqual([
@@ -76,16 +77,16 @@ describe("PDF paragraph grouping", () => {
       3,
       [fragment("Item one", 20, 700, "one"), fragment("Item two", 20, 680, "two")],
       [
-        { id: "one", role: "LI" },
-        { id: "two", role: "LI" },
+        { ids: ["one"], role: "LI" },
+        { ids: ["two"], role: "LI" },
       ],
     );
     const zoomed = groupPdfParagraphs(
       3,
       [fragment("Item one", 40, 1_400, "one"), fragment("Item two", 40, 1_360, "two")],
       [
-        { id: "one", role: "LI" },
-        { id: "two", role: "LI" },
+        { ids: ["one"], role: "LI" },
+        { ids: ["two"], role: "LI" },
       ],
     );
 
@@ -165,11 +166,49 @@ describe("PDF paragraph grouping", () => {
         fragment("1", 46, 706, "term", 6),
         fragment("continues", 54, 700, "term", 10),
       ],
-      [{ id: "term", role: "P" }],
+      [{ ids: ["term"], role: "P" }],
     );
 
     expect(paragraphs[0]?.text).toBe("Term (1) continues");
     expect(paragraphs[0]?.bodyFragmentIndexes).toEqual([0, 2]);
+  });
+
+  it("normalizes annotations across distinct IDs in one tagged structure block", () => {
+    const paragraphs = groupPdfParagraphs(
+      1,
+      [
+        fragment("Term", 20, 700, "body", 10),
+        fragment("1", 46, 706, "marker", 6),
+        fragment("continues", 54, 700, "tail", 10),
+      ],
+      [{ ids: ["body", "marker", "tail"], role: "P" }],
+    );
+
+    expect(paragraphs).toHaveLength(1);
+    expect(paragraphs[0]?.text).toBe("Term (1) continues");
+    expect(paragraphs[0]?.fragmentIndexes).toEqual([0, 1, 2]);
+    expect(paragraphs[0]?.bodyFragmentIndexes).toEqual([0, 2]);
+  });
+
+  it("rejects a uniform page without scanning outward from every fragment", () => {
+    const fragments = Array.from({ length: 200 }, (_, index) =>
+      fragment(String(index), index * 8, 700, undefined, 10),
+    );
+    let reads = 0;
+    const indexes = new Proxy(
+      fragments.map((_, index) => index),
+      {
+        get(target, property, receiver) {
+          if (typeof property === "string" && /^\d+$/u.test(property)) reads += 1;
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    );
+
+    const association = associateAnnotations(fragments, indexes);
+
+    expect(association.bodyIndexes).toHaveLength(200);
+    expect(reads).toBeLessThan(1_000);
   });
 
   it.each([

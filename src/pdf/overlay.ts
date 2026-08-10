@@ -19,17 +19,21 @@ export function createPdfOverlay(
     const right = Math.max(...rects.map((rect) => rect.right));
     const bottom = Math.max(...rects.map((rect) => rect.bottom));
     const margin = 8;
-    const width = Math.min(right - left, window.innerWidth - margin * 2);
+    const sourceInlineExtent = isVerticalText(document, target.bodySpans)
+      ? bottom - top
+      : right - left;
+    const width = Math.min(sourceInlineExtent, window.innerWidth - margin * 2);
     const x = Math.min(Math.max(left, margin), window.innerWidth - width - margin);
     overlay.style.inlineSize = `${width}px`;
     overlay.style.left = `${x}px`;
     overlay.style.fontSize = representativeFontSize(document, target.bodySpans) ?? "1rem";
     overlay.style.insetBlockStart = `${margin}px`;
     const height = overlay.getBoundingClientRect().height;
-    const y =
+    const preferredY =
       top + height <= window.innerHeight - margin
         ? Math.max(top, margin)
         : Math.max(margin, bottom - height);
+    const y = Math.min(preferredY, Math.max(margin, window.innerHeight - height - margin));
     overlay.style.insetBlockStart = `${y}px`;
   };
   const show = (target: PdfParagraphTarget, text: string): void => {
@@ -76,6 +80,30 @@ export function createPdfOverlay(
     },
   };
 }
+
+const isVerticalText = (document: Document, spans: readonly HTMLElement[]): boolean => {
+  const view = document.defaultView;
+  if (view === null) return false;
+  return spans.some((span) =>
+    [span, span.closest(".textLayer")].some((element) => {
+      if (element === null) return false;
+      const values = view
+        .getComputedStyle(element)
+        .transform.match(/^matrix\(([^)]+)\)$/u)?.[1]
+        ?.split(",")
+        .map(Number);
+      if (values?.length !== 6) return false;
+      const [a, b, c, d] = values;
+      return (
+        a !== undefined &&
+        b !== undefined &&
+        c !== undefined &&
+        d !== undefined &&
+        Math.abs(b) + Math.abs(c) > Math.abs(a) + Math.abs(d)
+      );
+    }),
+  );
+};
 
 const representativeFontSize = (
   document: Document,

@@ -16,9 +16,14 @@ export const associateAnnotations = (
 ): AnnotationAssociation => {
   const anchorByAnnotation = new Map<number, number>();
   const annotationIndexes = new Set<number>();
+  const maximumHeight = indexes.reduce(
+    (maximum, index) => Math.max(maximum, requiredAt(fragments, index).height),
+    0,
+  );
 
   for (const [position, candidateIndex] of indexes.entries()) {
     const candidate = requiredAt(fragments, candidateIndex);
+    if (maximumHeight <= candidate.height / 0.75) continue;
     const anchor = nearestBodyNeighbors(fragments, indexes, position, candidate)
       .filter(({ fragment }) => qualifiesAsAnchor(candidate, fragment))
       .sort(

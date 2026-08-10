@@ -97,6 +97,40 @@ describe("PDF translation overlay", () => {
     expect(overlay?.style.inlineSize).toBe("180px");
   });
 
+  it("uses the source inline extent for quarter-turn text and keeps the overlay in view", () => {
+    const textLayer = document.createElement("div");
+    textLayer.className = "textLayer";
+    textLayer.style.transform = "matrix(0, 1, -1, 0, 800, 0)";
+    const body = document.createElement("span");
+    body.textContent = "Rotated source";
+    body.style.transform = "matrix(1.1, 0, 0, 1, 0, 0)";
+    Object.defineProperty(body, "getClientRects", {
+      value: () => [{ left: 570, top: 100, right: 640, bottom: 500 }],
+    });
+    textLayer.append(body);
+    document.body.append(textLayer);
+    const target: PdfParagraphTarget = {
+      id: "vertical",
+      text: "Rotated source",
+      pageNumber: 1,
+      spans: [body],
+      bodySpans: [body],
+    };
+    const view = createPdfOverlay(document);
+    const overlay = document.querySelector<HTMLElement>(".lt-pdf-translation-overlay");
+    if (overlay === null) throw new TypeError("Missing PDF translation overlay");
+    Object.defineProperty(overlay, "getBoundingClientRect", {
+      value: () => ({ height: 120 }),
+    });
+
+    view.showResult(target, translated);
+
+    expect(overlay.style.inlineSize).toBe("400px");
+    expect(overlay.style.insetBlockStart).toBe("100px");
+    expect(Number.parseFloat(overlay.style.inlineSize)).toBeGreaterThan(70);
+    expect(Number.parseFloat(overlay.style.insetBlockStart) + 120).toBeLessThanOrEqual(592);
+  });
+
   it.each([
     {
       body: [

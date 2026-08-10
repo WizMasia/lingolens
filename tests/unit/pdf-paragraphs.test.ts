@@ -136,4 +136,57 @@ describe("PDF paragraph grouping", () => {
 
     expect(paragraphs.map(({ text }) => text)).toEqual(["Body", "1"]);
   });
+
+  it("normalizes annotations inside tagged paragraph blocks", () => {
+    const paragraphs = groupPdfParagraphs(
+      1,
+      [
+        fragment("Term", 20, 700, "term", 10),
+        fragment("1", 46, 706, "term", 6),
+        fragment("continues", 54, 700, "term", 10),
+      ],
+      [{ id: "term", role: "P" }],
+    );
+
+    expect(paragraphs[0]?.text).toBe("Term (1) continues");
+    expect(paragraphs[0]?.bodyFragmentIndexes).toEqual([0, 2]);
+  });
+
+  it.each([
+    { height: 7.49, bodyIndexes: [0] },
+    { height: 7.51, bodyIndexes: [0, 1] },
+  ])("uses the height threshold for a candidate of $height", ({ height, bodyIndexes }) => {
+    const paragraphs = groupPdfParagraphs(1, [
+      fragment("Term", 20, 700, undefined, 10),
+      fragment("1", 46, 706, undefined, height),
+    ]);
+
+    expect(paragraphs.flatMap(({ bodyFragmentIndexes: indexes }) => indexes)).toEqual(bodyIndexes);
+  });
+
+  it.each([
+    { y: 702, bodyIndexes: [0] },
+    { y: 701.9, bodyIndexes: [0, 1] },
+    { y: 712, bodyIndexes: [0] },
+    { y: 712.1, bodyIndexes: [0, 1] },
+  ])("uses the baseline threshold for a candidate at y=$y", ({ y, bodyIndexes }) => {
+    const paragraphs = groupPdfParagraphs(1, [
+      fragment("Term", 20, 700, undefined, 10),
+      fragment("1", 46, y, undefined, 6),
+    ]);
+
+    expect(paragraphs.flatMap(({ bodyFragmentIndexes: indexes }) => indexes)).toEqual(bodyIndexes);
+  });
+
+  it.each([
+    { x: 59, bodyIndexes: [0] },
+    { x: 59.1, bodyIndexes: [0, 1] },
+  ])("uses the horizontal-gap threshold for a candidate at x=$x", ({ x, bodyIndexes }) => {
+    const paragraphs = groupPdfParagraphs(1, [
+      fragment("Term", 20, 700, undefined, 10),
+      fragment("1", x, 706, undefined, 6),
+    ]);
+
+    expect(paragraphs.flatMap(({ bodyFragmentIndexes: indexes }) => indexes)).toEqual(bodyIndexes);
+  });
 });

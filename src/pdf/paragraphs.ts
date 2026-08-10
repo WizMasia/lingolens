@@ -1,3 +1,5 @@
+import { type AnnotationAssociation, associateAnnotations } from "./annotations";
+
 export type PdfTextFragment = Readonly<{
   text: string;
   x: number;
@@ -17,6 +19,7 @@ export type PdfParagraph = Readonly<{
   pageNumber: number;
   text: string;
   fragmentIndexes: readonly number[];
+  bodyFragmentIndexes: readonly number[];
 }>;
 
 type Line = Readonly<{
@@ -67,8 +70,22 @@ export function groupPdfParagraphs(
     }
   }
 
-  const grouped = [...tagged.values()].map((indexes) => paragraph(pageNumber, fragments, indexes));
-  const fallback = geometricParagraphs(pageNumber, fragments, untagged);
+  const grouped = [...tagged.values()].map((indexes) => {
+    const association = associateAnnotations(fragments, indexes);
+    return paragraph(
+      pageNumber,
+      fragments,
+      association.bodyIndexes,
+      association.annotationsByAnchor,
+    );
+  });
+  const association = associateAnnotations(fragments, untagged);
+  const fallback = geometricParagraphs(
+    pageNumber,
+    fragments,
+    association.bodyIndexes,
+    association.annotationsByAnchor,
+  );
   return [...grouped, ...fallback].sort(
     (left, right) => requiredAt(left.fragmentIndexes, 0) - requiredAt(right.fragmentIndexes, 0),
   );
@@ -78,6 +95,7 @@ const geometricParagraphs = (
   pageNumber: number,
   fragments: readonly PdfTextFragment[],
   indexes: readonly number[],
+  annotationsByAnchor: AnnotationAssociation["annotationsByAnchor"],
 ): PdfParagraph[] => {
   const baselines: number[][] = [];
   for (const index of [...indexes].sort(
@@ -146,17 +164,30 @@ const geometricParagraphs = (
       else requiredAt(paragraphs, paragraphs.length - 1).push(...line.fragmentIndexes);
       previous = line;
     }
-    return paragraphs.map((fragmentIndexes) => paragraph(pageNumber, fragments, fragmentIndexes));
+    return paragraphs.map((fragmentIndexes) =>
+      paragraph(pageNumber, fragments, fragmentIndexes, annotationsByAnchor),
+    );
   });
 };
 
 const paragraph = (
   pageNumber: number,
   fragments: readonly PdfTextFragment[],
-  fragmentIndexes: readonly number[],
+  bodyFragmentIndexes: readonly number[],
+  annotationsByAnchor: AnnotationAssociation["annotationsByAnchor"],
 ): PdfParagraph => {
-  const text = fragmentIndexes
-    .map((index) => requiredAt(fragments, index).text.trim())
+  const fragmentIndexes = bodyFragmentIndexes.flatMap((index) => [
+    index,
+    ...(annotationsByAnchor.get(index) ?? []),
+  ]);
+  const text = bodyFragmentIndexes
+    .map((index) => {
+      const body = requiredAt(fragments, index).text.trim();
+      const annotations = annotationsByAnchor.get(index) ?? [];
+      return `${body}${annotations
+        .map((annotationIndex) => ` (${requiredAt(fragments, annotationIndex).text.trim()})`)
+        .join("")}`;
+    })
     .filter(Boolean)
     .join(" ")
     .replace(/\s+/gu, " ")
@@ -166,6 +197,7 @@ const paragraph = (
     pageNumber,
     text,
     fragmentIndexes,
+    bodyFragmentIndexes,
   };
 };
 

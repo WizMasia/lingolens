@@ -55,4 +55,47 @@ describe("PDF translation overlay", () => {
     expect(overlay?.lang).toBe("ko");
     expect(overlay?.dir).toBe("ltr");
   });
+
+  it.each([
+    {
+      body: [
+        { text: "brief", fontSize: "10px" },
+        { text: "a much longer source body span", fontSize: "20px" },
+      ],
+      expectedFontSize: "20px",
+    },
+    {
+      body: [
+        { text: "a substantially longer body span", fontSize: "14px" },
+        { text: "tiny", fontSize: "30px" },
+      ],
+      expectedFontSize: "14px",
+    },
+  ])("uses the character-weighted lower median body font size of $expectedFontSize", ({
+    body,
+    expectedFontSize,
+  }) => {
+    const bodySpans = body.map(({ text, fontSize }, index) => {
+      const span = document.createElement("span");
+      span.textContent = text;
+      span.style.fontSize = fontSize;
+      Object.defineProperty(span, "getClientRects", {
+        value: () => [{ left: 100 + index, top: 80, right: 280, bottom: 100 }],
+      });
+      return span;
+    });
+    document.body.append(...bodySpans);
+    const target: PdfParagraphTarget = {
+      id: "weighted",
+      text: "source",
+      pageNumber: 1,
+      spans: bodySpans,
+      bodySpans,
+    };
+
+    createPdfOverlay(document).showResult(target, translated);
+
+    const overlay = document.querySelector<HTMLElement>(".lt-pdf-translation-overlay");
+    expect(overlay?.style.fontSize).toBe(expectedFontSize);
+  });
 });

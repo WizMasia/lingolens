@@ -134,6 +134,11 @@ const paragraphTargets = async (
         if (span === undefined) throw new RangeError(`Missing PDF text span at index ${index}`);
         return span;
       }),
+      bodySpans: paragraph.bodyFragmentIndexes.map((index) => {
+        const span = spans[index];
+        if (span === undefined) throw new RangeError(`Missing PDF text span at index ${index}`);
+        return span;
+      }),
     }),
   );
 };

@@ -19,12 +19,12 @@ export function createPdfOverlay(
     const right = Math.max(...rects.map((rect) => rect.right));
     const bottom = Math.max(...rects.map((rect) => rect.bottom));
     const margin = 8;
-    const width = Math.min(Math.max(right - left, 240), 640, window.innerWidth - margin * 2);
+    const width = Math.min(right - left, window.innerWidth - margin * 2);
     const x = Math.min(Math.max(left, margin), window.innerWidth - width - margin);
     overlay.style.inlineSize = `${width}px`;
     overlay.style.insetInlineStart = `${x}px`;
+    overlay.style.fontSize = representativeFontSize(document, target.bodySpans) ?? "1rem";
     overlay.style.insetBlockStart = `${margin}px`;
-    overlay.style.minBlockSize = `${Math.min(Math.max(bottom - top, 48), window.innerHeight - margin * 2)}px`;
     const height = overlay.getBoundingClientRect().height;
     const y =
       top + height <= window.innerHeight - margin
@@ -76,6 +76,28 @@ export function createPdfOverlay(
     },
   };
 }
+
+const representativeFontSize = (
+  document: Document,
+  spans: readonly HTMLElement[],
+): string | undefined => {
+  const view = document.defaultView;
+  if (view === null) return undefined;
+  const values = spans
+    .map((span) => ({
+      size: Number.parseFloat(view.getComputedStyle(span).fontSize),
+      weight: Math.max(span.textContent?.trim().length ?? 0, 1),
+    }))
+    .filter(({ size }) => Number.isFinite(size) && size > 0)
+    .sort((left, right) => left.size - right.size);
+  const midpoint = values.reduce((sum, { weight }) => sum + weight, 0) / 2;
+  let cumulative = 0;
+  for (const value of values) {
+    cumulative += value.weight;
+    if (cumulative >= midpoint) return `${value.size}px`;
+  }
+  return undefined;
+};
 
 const isRtl = (language: string): boolean => /^(ar|fa|he|ur)(-|$)/u.test(language);
 

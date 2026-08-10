@@ -5,6 +5,7 @@ export type PdfParagraphTarget = Readonly<{
   text: string;
   pageNumber: number;
   spans: readonly HTMLElement[];
+  bodySpans: readonly HTMLElement[];
 }>;
 
 export type PdfParagraphView = Readonly<{

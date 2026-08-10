@@ -29,6 +29,7 @@ const target = (id: string, text: string, spans: readonly HTMLElement[]): PdfPar
   text,
   pageNumber: 1,
   spans,
+  bodySpans: spans,
 });
 
 const requiredElement = (selector: string): HTMLElement => {

@@ -4,6 +4,13 @@ All notable changes to LingoLens are documented here.
 
 ## Unreleased
 
+## 0.2.1
+
+- Match PDF translation overlays to source paragraph width, line wrapping, and weighted font size.
+- Normalize superscript and footnote markers beside their source word as parenthetical text.
+- Keep headings, body paragraphs, and footnotes as separate translation targets.
+- Preserve readable overlay geometry for tagged PDFs, RTL text, zoom, and rotated pages.
+
 ## 0.2.0
 
 - Add an optional text-PDF viewer with paragraph-level hover and keyboard translation overlays.
